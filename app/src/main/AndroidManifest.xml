@@ -12,14 +12,20 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Documentation"
         tools:targetApi="31">
+
+        <!-- Firts activity to show when starts the aplication -->
+        <activity android:name=".splash_activity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.Main"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+
+        <!-- Main activity to show after the splash activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
         </activity>
     </application>
 
