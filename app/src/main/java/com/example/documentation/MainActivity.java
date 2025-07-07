@@ -1,6 +1,8 @@
 package com.example.documentation;
 
 import android.os.Bundle;
+import android.widget.Adapter;
+import android.widget.ListView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -66,7 +68,15 @@ public class MainActivity extends AppCompatActivity {
                 reader.close(); // Close the reader
 
                 // Display how many manuals were loaded
-                runOnUiThread(() -> Toast.makeText(this, "Manuales encontrados: " + listaManuales.size(), Toast.LENGTH_LONG).show());
+                runOnUiThread(() -> {
+                    Toast.makeText(this, "Manuales encontrados: " + listaManuales.size(), Toast.LENGTH_LONG).show();
+                    ManualAdapter adapter = new ManualAdapter(this, listaManuales);
+                    ListView lista = findViewById(R.id.lista_manuales);
+                    lista.setAdapter(adapter);
+                });
+
+
+
 
             } catch (Exception e) {
                 e.printStackTrace();
