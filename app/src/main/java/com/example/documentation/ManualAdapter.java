@@ -1,11 +1,17 @@
 package com.example.documentation;
 
 import android.content.Context;
+import android.content.Intent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
 import android.widget.TextView;
+import android.widget.Toast;
+import java.net.URL;
+import java.net.HttpURLConnection;
+
+
 
 import java.io.File;
 import java.util.ArrayList;
@@ -63,6 +69,54 @@ public class ManualAdapter extends BaseAdapter
             estadoManual.setTextColor(0xFF1565C0);//Azul;
         }
 
+        estadoManual.setOnClickListener(v -> {
+            if (!archivo.exists()) {
+                // Si el archivo no existe, lo descargamos
+                descargarManual(manual, estadoManual);
+            } else {
+                Toast.makeText(context, "Manual ya descargado", Toast.LENGTH_SHORT).show();
+                Intent intent = new Intent(context, VisorManualActivity.class);
+                intent.putExtra(VisorManualActivity.EXTRA_MANUAL_PATH, archivo.getAbsolutePath());
+                context.startActivity(intent);
+            }
+        });
+
+
         return convertView;
     }
+    private void descargarManual(Manual manual, TextView estadoManual) {
+        new Thread(() -> {
+            try {
+                URL url = new URL(manual.enlace);
+                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                connection.connect();
+
+                java.io.InputStream input = connection.getInputStream();
+                File archivo = new File(context.getFilesDir(), manual.Nombre + ".pdf");
+                java.io.FileOutputStream output = new java.io.FileOutputStream(archivo);
+
+                byte[] buffer = new byte[4096];
+                int bytesRead;
+                while ((bytesRead = input.read(buffer)) != -1) {
+                    output.write(buffer, 0, bytesRead);
+                }
+
+                output.close();
+                input.close();
+
+                ((MainActivity) context).runOnUiThread(() -> {
+                    estadoManual.setText("Abrir");
+                    estadoManual.setTextColor(0xFF2E7D32); // Verde
+                    Toast.makeText(context, "Descargado: " + manual.Nombre, Toast.LENGTH_SHORT).show();
+                });
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                ((MainActivity) context).runOnUiThread(() ->
+                        Toast.makeText(context, "Error al descargar " + manual.Nombre, Toast.LENGTH_SHORT).show()
+                );
+            }
+        }).start();
+    }
+
 }

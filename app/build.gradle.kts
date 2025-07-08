@@ -25,6 +25,7 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -32,7 +33,7 @@ android {
 }
 
 dependencies {
-
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
     implementation(libs.appcompat)
     implementation(libs.material)
     implementation(libs.activity)
