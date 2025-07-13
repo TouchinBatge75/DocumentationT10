@@ -33,7 +33,7 @@ android {
 }
 
 dependencies {
-    implementation(libs.pdfbox.android)
+    implementation(libs.itextg)
     implementation(libs.appcompat)
     implementation(libs.material)
     implementation(libs.activity)

@@ -3,10 +3,11 @@ package com.example.documentation;
 import android.os.Bundle;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import androidx.appcompat.app.AppCompatActivity;
 
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.text.PDFTextStripper;
+import com.itextpdf.text.pdf.PdfReader;
+import com.itextpdf.text.pdf.parser.PdfTextExtractor;
 
 import java.io.File;
 
@@ -21,35 +22,33 @@ public class VisorManualActivity extends AppCompatActivity {
 
         TextView textoManual = findViewById(R.id.texto_manual);
 
-        // Obtenemos la ruta del archivo PDF que nos pasaron desde el Intent
         String rutaArchivo = getIntent().getStringExtra(EXTRA_MANUAL_PATH);
 
         if (rutaArchivo != null) {
-            try {
-                // Abrimos el archivo PDF local
-                File archivo = new File(rutaArchivo);
+            File archivo = new File(rutaArchivo);
+            if (archivo.exists()) {
+                try {
+                    // Leer el PDF
+                    PdfReader reader = new PdfReader(rutaArchivo);
+                    StringBuilder texto = new StringBuilder();
 
-                // Cargamos el PDF con PdfBox
-                PDDocument document = PDDocument.load(archivo);
+                    for (int i = 1; i <= reader.getNumberOfPages(); i++) {
+                        texto.append(PdfTextExtractor.getTextFromPage(reader, i));
+                        texto.append("\n\n");
+                    }
 
-                // Creamos un extractor de texto
-                PDFTextStripper stripper = new PDFTextStripper();
+                    reader.close();
+                    textoManual.setText(texto.toString());
 
-                // Extraemos todo el texto del PDF
-                String texto = stripper.getText(document);
-
-                // Cerramos el documento
-                document.close();
-
-                // Mostramos el texto extraído en el TextView
-                textoManual.setText(texto);
-
-            } catch (Exception e) {
-                e.printStackTrace();
-                Toast.makeText(this, "Error al leer el manual", Toast.LENGTH_SHORT).show();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    Toast.makeText(this, "Error al leer el PDF", Toast.LENGTH_LONG).show();
+                }
+            } else {
+                Toast.makeText(this, "Archivo no encontrado", Toast.LENGTH_LONG).show();
             }
         } else {
-            Toast.makeText(this, "Ruta del manual no válida", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Ruta inválida", Toast.LENGTH_LONG).show();
         }
     }
 }

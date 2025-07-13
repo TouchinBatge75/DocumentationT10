@@ -11,7 +11,7 @@ import android.view.animation.AnimationUtils; //For load animations on XML
 import android.widget.ImageView;
 import android.widget.TextView;
 
-public class splash_activity extends Activity
+public class SplashActivity extends Activity
 {
     @Override
     protected void onCreate(Bundle savedInstanceState)
@@ -31,7 +31,7 @@ public class splash_activity extends Activity
         //Create a 2.5 seconds delay on the splash activity
         new Handler().postDelayed(()->
         {
-            startActivity(new Intent(splash_activity.this, MainActivity.class)); //Start the MainActivity
+            startActivity(new Intent(SplashActivity.this, MainActivity.class)); //Start the MainActivity
             finish();//Close the splash activity
         },2500);
     }

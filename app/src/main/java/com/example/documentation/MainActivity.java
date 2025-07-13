@@ -28,7 +28,7 @@ public class MainActivity extends AppCompatActivity {
     private ArrayList<Manual> listaManuales = new ArrayList<>();
 
     // Direct download link to the .txt file hosted in Google Drive
-    private static final String LINK_TXT = ""; // Aquí pon el enlace tipo: https://drive.google.com/uc?export=download&id=...
+    private static final String LINK_TXT = "https://drive.google.com/file/d/1fPkpdKk3e4gzuv_vGb9ttexhtAtXSdVW/view?usp=sharing"; // Aquí pon el enlace tipo: https://drive.google.com/uc?export=download&id=...
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
