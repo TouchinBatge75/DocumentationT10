@@ -18,21 +18,21 @@ public class SplashActivity extends Activity
     {
         super.onCreate(savedInstanceState);
 
-        setContentView(R.layout.activity_splash);        //Set a design to XML screen
+        setContentView(R.layout.activity_splash);
 
-        Animation fadeIn = AnimationUtils.loadAnimation(this,R.anim.fade_in);//Load the animation
+        Animation fadeIn = AnimationUtils.loadAnimation(this,R.anim.fade_in);//Carga la animacion
 
-        ImageView logo = findViewById(R.id.logo);//Find the ImageView with id 'logo'
-        TextView titulo = findViewById(R.id.tituloApp);//Find the TextView with id 'tituloApp'
+        ImageView logo = findViewById(R.id.logo);//Busca la imagen para logo'
+        TextView titulo = findViewById(R.id.tituloApp);//Busca el visor de texto con el titulo 'tituloApp'
 
-        logo.startAnimation(fadeIn);//Vanish animation on the logo
-        titulo.startAnimation(fadeIn);//Vanish animation on the title text
+        logo.startAnimation(fadeIn);//efecto de desvanecido en el logo
+        titulo.startAnimation(fadeIn);//efecto de desvanecido en el texto
 
-        //Create a 2.5 seconds delay on the splash activity
+        //retraso de 2.5 sg para la splash Activity
         new Handler().postDelayed(()->
         {
-            startActivity(new Intent(SplashActivity.this, MainActivity.class)); //Start the MainActivity
-            finish();//Close the splash activity
+            startActivity(new Intent(SplashActivity.this, MainActivity.class)); //Inicia la actividad Principal
+            finish();//Cierra la splash Activity
         },2500);
     }
 }

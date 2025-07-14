@@ -5,9 +5,20 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:padding="26dp">
+
+    <Button
+        android:id="@+id/btn_descargar_manuales"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Descargar manuales"
+        android:layout_marginTop="16dp"
+        android:layout_gravity="center" />
+
     <ListView
         android:id="@+id/lista_manuales"
         android:layout_width="match_parent"
         android:layout_height="match_parent"/>
+
+
 
 </LinearLayout>
