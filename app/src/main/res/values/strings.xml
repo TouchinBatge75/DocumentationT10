@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Documentation</string>
+    <string name="default_web_client_id">358361621841-51i65u5ovvq62t6igt4sscdcpajtenfo.apps.googleusercontent.com</string>
+
 </resources>
