@@ -1,5 +1,8 @@
 plugins {
-    alias(libs.plugins.android.application)
+
+        id("com.android.application")
+        id("org.jetbrains.kotlin.android")
+
 }
 
 android {
@@ -12,7 +15,6 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -26,25 +28,35 @@ android {
         }
     }
 
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/INDEX.LIST",
+                "META-INF/DEPENDENCIES")
+        }
+    }
+
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 }
 
 dependencies {
+    implementation("androidx.core:core-ktx:1.16.0")
+    implementation("androidx.appcompat:appcompat:1.7.1")
+    implementation("com.google.android.material:material:1.12.0")
+    implementation("androidx.constraintlayout:constraintlayout:2.2.1")
+    implementation("com.itextpdf:itextpdf:5.5.13.3")
 
-    implementation 'com.google.android.gms:play-services-auth:20.7.0'
-    implementation 'com.google.api-client:google-api-client-android:1.34.1'
-    implementation 'com.google.apis:google-api-services-drive:v3-rev20230227-2.0.0'
 
+    implementation("com.google.android.gms:play-services-auth:21.0.0")
+    implementation("com.google.apis:google-api-services-drive:v3-rev20250701-2.0.0")
 
-    implementation(libs.itextg)
-    implementation(libs.appcompat)
-    implementation(libs.material)
-    implementation(libs.activity)
-    implementation(libs.constraintlayout)
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.ext.junit)
-    androidTestImplementation(libs.espresso.core)
+    implementation("com.google.api-client:google-api-client-android:2.2.0")
+    implementation("com.google.api-client:google-api-client-gson:2.2.0")
+
+    testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
 }

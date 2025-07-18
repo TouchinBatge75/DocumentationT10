@@ -6,7 +6,9 @@ appcompatVersion = "1.6.1"
 constraintlayoutVersion = "2.1.4"
 espressoCoreVersion = "3.5.1"
 googleApiClientAndroid = "1.34.1"
+googleApiClientAndroidVersion = "1.35.0"
 googleApiServicesDrive = "v3-rev20230227-2.0.0"
+googleApiServicesDriveVersion = "v3-rev20230828-2.0.0"
 itextg = "5.5.10"
 junit = "4.13.2"
 junitVersion = "1.2.1"
@@ -18,14 +20,17 @@ constraintlayout = "2.2.1"
 materialVersion = "1.11.0"
 pdfboxAndroid = "2.0.27.0"
 playServicesAuth = "21.3.0"
-
+playServicesAuthVersion = "20.7.0"
+kotlin ="2.0.0"
 [libraries]
 activity-v180 = { module = "androidx.activity:activity", version.ref = "activityVersion" }
 appcompat-v161 = { module = "androidx.appcompat:appcompat", version.ref = "appcompatVersion" }
 constraintlayout-v214 = { module = "androidx.constraintlayout:constraintlayout", version.ref = "constraintlayoutVersion" }
 espresso-core-v351 = { module = "androidx.test.espresso:espresso-core", version.ref = "espressoCoreVersion" }
 google-api-client-android = { module = "com.google.api-client:google-api-client-android", version.ref = "googleApiClientAndroid" }
+google-api-client-android-v1350 = { module = "com.google.api-client:google-api-client-android", version.ref = "googleApiClientAndroidVersion" }
 google-api-services-drive = { module = "com.google.apis:google-api-services-drive", version.ref = "googleApiServicesDrive" }
+google-api-services-drive-vv3rev20230828200 = { module = "com.google.apis:google-api-services-drive", version.ref = "googleApiServicesDriveVersion" }
 itextg = { module = "com.itextpdf:itextg", version.ref = "itextg" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
@@ -38,7 +43,9 @@ constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayo
 material-v1110 = { module = "com.google.android.material:material", version.ref = "materialVersion" }
 pdfbox-android = { module = "com.github.TomRoush:PdfBox-Android", version.ref = "pdfboxAndroid" }
 play-services-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "playServicesAuth" }
+play-services-auth-v2070 = { module = "com.google.android.gms:play-services-auth", version.ref = "playServicesAuthVersion" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version = "2.0.0" }
 
