@@ -3,6 +3,7 @@ package com.example.documentation;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
+import android.widget.Button;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
@@ -16,8 +17,6 @@ import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.tasks.Task;
 
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential;
-import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
-import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
@@ -37,7 +36,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main); // Asegúrate de que tengas este layout con el botón
 
+        // Configurar opciones de Google Sign-In
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                 .requestEmail()
                 .requestScopes(new com.google.android.gms.common.api.Scope(DriveScopes.DRIVE_READONLY))
@@ -45,8 +46,14 @@ public class MainActivity extends AppCompatActivity {
 
         mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
 
-        // Iniciar el proceso de autenticación
-        startActivityForResult(mGoogleSignInClient.getSignInIntent(), RC_SIGN_IN);
+        // Asignar acción al botón
+        Button btnDescargar = findViewById(R.id.btn_descargar_manuales);
+        btnDescargar.setOnClickListener(view -> iniciarAutenticacionGoogle());
+    }
+
+    private void iniciarAutenticacionGoogle() {
+        Intent signInIntent = mGoogleSignInClient.getSignInIntent();
+        startActivityForResult(signInIntent, RC_SIGN_IN);
     }
 
     @Override
@@ -80,7 +87,8 @@ public class MainActivity extends AppCompatActivity {
                 .setApplicationName("Documentation App")
                 .build();
 
-        // Aquí puedes implementar la lógica para listar archivos o descargar documentos
         Log.d(TAG, "Servicio de Drive inicializado correctamente.");
+
+        // Aquí puedes continuar con la lógica para descargar los archivos...
     }
 }
