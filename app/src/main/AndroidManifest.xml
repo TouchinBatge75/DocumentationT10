@@ -7,7 +7,6 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.INTERNET" />
 
-
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -19,28 +18,25 @@
         android:theme="@style/Theme.Documentation"
         tools:targetApi="31">
 
-        <!-- Firts activity to show when starts the aplication -->
-        <activity android:name=".SplashActivity"
+        <!-- SplashActivity será la que inicie la app -->
+        <activity
+            android:name=".SplashActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+
+        <!-- Metadatos para autenticación de Google -->
         <meta-data
             android:name="com.google.android.gms.client_id"
             android:value="@string/default_web_client_id" />
 
-
-        <!-- Main activity to show after the splash activity -->
+        <!-- MainActivity sin intent-filter -->
         <activity
             android:name=".MainActivity"
-            android:exported="true">
-        <intent-filter>
-            <action android:name="android.intent.action.MAIN"/>
-            <category android:name="android.intent.category.LAUNCHER"/>
-        </intent-filter>
-        </activity>
+            android:exported="true" />
     </application>
 
 </manifest>

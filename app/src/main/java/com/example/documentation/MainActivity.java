@@ -3,7 +3,9 @@ package com.example.documentation;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.ListView;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
@@ -23,8 +25,12 @@ import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.DriveScopes;
+import com.google.api.services.drive.model.File;
+import com.google.api.services.drive.model.FileList;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -33,10 +39,19 @@ public class MainActivity extends AppCompatActivity {
     private GoogleSignInClient mGoogleSignInClient;
     private Drive mDriveService;
 
+    private ListView listView;
+    private ArrayAdapter<String> adapter;
+    private List<String> nombres = new ArrayList<>();
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main); // Asegúrate de que tengas este layout con el botón
+        setContentView(R.layout.activity_main);
+
+        // Inicializar ListView y adaptador
+        listView = findViewById(R.id.lista_manuales);
+        adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, nombres);
+        listView.setAdapter(adapter);
 
         // Configurar opciones de Google Sign-In
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -70,7 +85,8 @@ public class MainActivity extends AppCompatActivity {
                 }
             } catch (ApiException e) {
                 Toast.makeText(this, "Error al iniciar sesión", Toast.LENGTH_SHORT).show();
-                Log.e(TAG, "Google Sign-In error", e);
+                Log.e(TAG, "Error completo al iniciar sesión: " + e.toString()); // ¡Este debe aparecer!
+                e.printStackTrace(); // Fuerza la impresión en LogCat
             }
         }
     }
@@ -89,6 +105,39 @@ public class MainActivity extends AppCompatActivity {
 
         Log.d(TAG, "Servicio de Drive inicializado correctamente.");
 
-        // Aquí puedes continuar con la lógica para descargar los archivos...
+        // ID puro de la carpeta (sin "?usp=sharing")
+        String folderId = "1NV3jEo9lLoWUKxGYf5SfFtwbH1U5H5Rb";
+
+        new Thread(() -> {
+            try {
+                FileList result = mDriveService.files().list()
+                        .setQ("'" + folderId + "' in parents and trashed = false")
+                        .setFields("files(id, name, mimeType)")
+                        .execute();
+
+                List<File> files = result.getFiles();
+
+                if (files != null && !files.isEmpty()) {
+                    List<String> nuevosNombres = new ArrayList<>();
+                    for (File file : files) {
+                        Log.d(TAG, "Archivo: " + file.getName() + " (ID: " + file.getId() + ")");
+                        nuevosNombres.add(file.getName());
+                    }
+
+                    runOnUiThread(() -> {
+                        adapter.clear();
+                        adapter.addAll(nuevosNombres);
+                        adapter.notifyDataSetChanged();
+                    });
+
+                } else {
+                    runOnUiThread(() ->
+                            Toast.makeText(this, "No hay archivos en la carpeta", Toast.LENGTH_SHORT).show()
+                    );
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error al listar archivos", e);
+            }
+        }).start();
     }
 }
