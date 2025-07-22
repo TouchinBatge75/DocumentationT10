@@ -2,27 +2,27 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="#000000"
     android:gravity="center"
     android:orientation="vertical"
-    android:padding="32dp"
-    android:background="#FFFFFF">
+    android:padding="32dp">
 
 
     <!-- Logo -->
     <ImageView
-        android:id = "@+id/logo"
+        android:id="@+id/logo"
         android:layout_width="150dp"
         android:layout_height="150dp"
-        android:src="@mipmap/ic_launcher"
         android:layout_marginBottom="16dp"
-    />
+        android:src="@mipmap/ic_launcher" />
     <!-- Title -->
     <TextView
-        android:id= "@+id/tituloApp"
-        android:layout_width="50dp"
-        android:layout_height="50dp"
-        android:text="Documentacion"
-        android:textSize="24sp"
-        android:textStyle="bold"
-        android:textColor="#000000" />
+        android:id="@+id/tituloApp"
+        android:layout_width="314dp"
+        android:layout_height="173dp"
+        android:gravity="center"
+        android:text="Documentacion\n Fundacion Dr.Hernandez Zurita"
+        android:textColor="#FFFFFF"
+        android:textSize="30sp"
+        android:textStyle="bold" />
 </LinearLayout>
