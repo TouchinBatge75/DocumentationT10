@@ -27,9 +27,21 @@ import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.DriveScopes;
 import com.google.api.services.drive.model.File;
 import com.google.api.services.drive.model.FileList;
+import com.google.common.reflect.TypeToken;
 
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+
+import com.google.gson.Gson;
+
+
+import java.io.OutputStream;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
@@ -38,6 +50,8 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
     private GoogleSignInClient mGoogleSignInClient;
     private Drive mDriveService;
+
+
 
     private ListView listView;
     private ArrayAdapter<String> adapter;
@@ -52,6 +66,20 @@ public class MainActivity extends AppCompatActivity {
         listView = findViewById(R.id.lista_manuales);
         adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, nombres);
         listView.setAdapter(adapter);
+
+        listView.setOnItemClickListener((parent, view, position, id) -> {
+            String nombreManual = nombres.get(position);
+            java.io.File archivoManual = new java.io.File(getFilesDir(), "Manuales/" + nombreManual);
+
+            if (archivoManual.exists()) {
+                Intent intent = new Intent(MainActivity.this, VisorManualActivity.class);
+                intent.putExtra(VisorManualActivity.EXTRA_MANUAL_PATH, archivoManual.getAbsolutePath());
+                startActivity(intent);
+            } else {
+                Toast.makeText(MainActivity.this, "Archivo no encontrado: " + nombreManual, Toast.LENGTH_SHORT).show();
+            }
+        });
+
 
         // Configurar opciones de Google Sign-In
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -106,30 +134,51 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "Servicio de Drive inicializado correctamente.");
 
         // ID puro de la carpeta (sin "?usp=sharing")
-        String folderId = "1NV3jEo9lLoWUKxGYf5SfFtwbH1U5H5Rb";
+        String folderId = "1QnkCbJVWy6GwdX-zSxgNQL1KiIWUsdNH";
 
         new Thread(() -> {
             try {
                 FileList result = mDriveService.files().list()
                         .setQ("'" + folderId + "' in parents and trashed = false")
-                        .setFields("files(id, name, mimeType)")
+                        .setFields("files(id, name, mimeType, modifiedTime)")
                         .execute();
 
                 List<File> files = result.getFiles();
+                List<ArchivoDescargado> historial = cargarHistorial();
+                List<ArchivoDescargado> nuevoHistorial = new ArrayList<>(historial);
+                List<String> nuevosNombres = new ArrayList<>();
 
                 if (files != null && !files.isEmpty()) {
-                    List<String> nuevosNombres = new ArrayList<>();
                     for (File file : files) {
-                        Log.d(TAG, "Archivo: " + file.getName() + " (ID: " + file.getId() + ")");
+                        if (esNuevoOEditado(file, historial)) {
+                            descargarYGuardarArchivo(file);
+
+                            ArchivoDescargado nuevo = new ArchivoDescargado(
+                                    file.getId(),
+                                    file.getName(),
+                                    file.getModifiedTime().toStringRfc3339()
+                            );
+
+                            // Actualizar historial
+                            for (Iterator<ArchivoDescargado> iterator = nuevoHistorial.iterator(); iterator.hasNext();) {
+                                ArchivoDescargado a = iterator.next();
+                                if (a.getId().equals(nuevo.getId())) {
+                                    iterator.remove();
+                                }
+                            }
+
+                        }
                         nuevosNombres.add(file.getName());
                     }
+
+                    guardarHistorial(nuevoHistorial);
 
                     runOnUiThread(() -> {
                         adapter.clear();
                         adapter.addAll(nuevosNombres);
                         adapter.notifyDataSetChanged();
+                        Toast.makeText(this, "Sincronización completa.", Toast.LENGTH_SHORT).show();
                     });
-
                 } else {
                     runOnUiThread(() ->
                             Toast.makeText(this, "No hay archivos en la carpeta", Toast.LENGTH_SHORT).show()
@@ -140,4 +189,69 @@ public class MainActivity extends AppCompatActivity {
             }
         }).start();
     }
+
+    private List<ArchivoDescargado> cargarHistorial() {
+        java.io.File file = new java.io.File(getFilesDir(), "historial.json");
+        if (!file.exists()) return new ArrayList<>();
+
+        try (FileReader reader = new FileReader(file)) {
+            Gson gson = new Gson();
+            Type listType = new TypeToken<List<ArchivoDescargado>>() {}.getType();
+            return gson.fromJson(reader, listType);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return new ArrayList<>();
+        }
+    }
+
+    private void guardarHistorial(List<ArchivoDescargado> archivos) {
+        try (FileWriter writer = new FileWriter(new java.io.File(getFilesDir(), "historial.json"))) {
+            new Gson().toJson(archivos, writer);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private boolean esNuevoOEditado(File fileDrive, List<ArchivoDescargado> historial) {
+        for (ArchivoDescargado local : historial) {
+            if (fileDrive.getId().equals(local.getId())) {
+                return !fileDrive.getModifiedTime().toStringRfc3339().equals(local.getModifiedTime());
+            }
+        }
+        return true;
+    }
+
+
+    private void descargarYGuardarArchivo(File archivoDrive) {
+        new Thread(() -> {
+            try {
+                // Crear carpeta "Manuales" dentro del almacenamiento privado de la app
+                java.io.File folder = new java.io.File(getFilesDir(), "Manuales");
+                if (!folder.exists()) {
+                    folder.mkdirs();
+                }
+
+                // Archivo local con el mismo nombre que el archivo de Drive
+                java.io.File archivoLocal = new java.io.File(folder, archivoDrive.getName());
+
+                // Descargar el archivo y guardar en archivoLocal
+                FileOutputStream outputStream = new FileOutputStream(archivoLocal);
+                mDriveService.files().get(archivoDrive.getId()).executeMediaAndDownloadTo(outputStream);
+                outputStream.close();
+
+                Log.d(TAG, "Archivo descargado y guardado en: " + archivoLocal.getAbsolutePath());
+
+                runOnUiThread(() ->
+                        Toast.makeText(this, "Archivo descargado: " + archivoDrive.getName(), Toast.LENGTH_SHORT).show()
+                );
+            } catch (Exception e) {
+                Log.e(TAG, "Error descargando archivo: " + archivoDrive.getName(), e);
+                runOnUiThread(() ->
+                        Toast.makeText(this, "Error descargando archivo: " + archivoDrive.getName(), Toast.LENGTH_SHORT).show()
+                );
+            }
+        }).start();
+    }
+
+
 }

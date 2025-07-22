@@ -28,6 +28,8 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".VisorManualActivity" />
+
         <!-- Metadatos para autenticación de Google -->
         <meta-data
             android:name="com.google.android.gms.client_id"
