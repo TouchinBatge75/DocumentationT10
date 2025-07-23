@@ -9,13 +9,14 @@
 
 
     <!-- Logo -->
+    <!-- Title -->
     <ImageView
         android:id="@+id/logo"
-        android:layout_width="150dp"
-        android:layout_height="150dp"
+        android:layout_width="190dp"
+        android:layout_height="189dp"
         android:layout_marginBottom="16dp"
-        android:src="@mipmap/ic_launcher" />
-    <!-- Title -->
+        android:src="@drawable/logo" />
+
     <TextView
         android:id="@+id/tituloApp"
         android:layout_width="314dp"
