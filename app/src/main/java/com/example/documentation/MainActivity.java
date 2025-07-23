@@ -1,14 +1,18 @@
 package com.example.documentation;
 
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ListView;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
@@ -67,6 +71,8 @@ public class MainActivity extends AppCompatActivity {
         adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, nombres);
         listView.setAdapter(adapter);
 
+        cargarManualesLocales();
+
         listView.setOnItemClickListener((parent, view, position, id) -> {
             String nombreManual = nombres.get(position);
             java.io.File archivoManual = new java.io.File(getFilesDir(), "Manuales/" + nombreManual);
@@ -80,6 +86,29 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        listView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
+            @Override
+            public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
+                String nombreArchivo = adapter.getItem(position);
+
+                new AlertDialog.Builder(MainActivity.this)
+                        .setTitle("Eliminar manual")
+                        .setMessage("¿Deseas eliminar \"" + nombreArchivo + "\"?")
+                        .setPositiveButton("Eliminar", new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog, int which) {
+                                eliminarManual(nombreArchivo);
+                            }
+                        })
+                        .setNegativeButton("Cancelar", null)
+                        .show();
+
+                return true;
+            }
+        });
+
+
+
+
 
         // Configurar opciones de Google Sign-In
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -92,6 +121,38 @@ public class MainActivity extends AppCompatActivity {
         // Asignar acción al botón
         Button btnDescargar = findViewById(R.id.btn_descargar_manuales);
         btnDescargar.setOnClickListener(view -> iniciarAutenticacionGoogle());
+    }
+
+    private void eliminarManual(String nombreArchivo) {
+        java.io.File carpeta = new java.io.File(getFilesDir(), "Manuales");
+        java.io.File archivo = new  java.io.File(carpeta, nombreArchivo);
+
+        if (archivo.exists()) {
+            if (archivo.delete()) {
+                Toast.makeText(this, "Archivo eliminado", Toast.LENGTH_SHORT).show();
+                adapter.remove(nombreArchivo);
+                adapter.notifyDataSetChanged();
+            } else {
+                Toast.makeText(this, "No se pudo eliminar el archivo", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    private void cargarManualesLocales() {
+        java.io.File carpeta = new java.io.File(getFilesDir(), "Manuales");
+        if (!carpeta.exists()) return;
+
+        java.io.File[] archivos = carpeta.listFiles();
+        if (archivos == null || archivos.length == 0) return;
+
+        List<String> nombresLocales = new ArrayList<>();
+        for (java.io.File archivo : archivos) {
+            nombresLocales.add(archivo.getName());
+        }
+
+        adapter.clear();
+        adapter.addAll(nombresLocales);
+        adapter.notifyDataSetChanged();
     }
 
     private void iniciarAutenticacionGoogle() {
