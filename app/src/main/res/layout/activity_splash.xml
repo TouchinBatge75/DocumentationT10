@@ -22,7 +22,7 @@
         android:layout_width="314dp"
         android:layout_height="173dp"
         android:gravity="center"
-        android:text="Documentacion\n Fundacion Dr.Hernandez Zurita"
+        android:text="Documentacion\n Fundacion Dr. Hernandez Zurita"
         android:textColor="#FFFFFF"
         android:textSize="30sp"
         android:textStyle="bold" />
