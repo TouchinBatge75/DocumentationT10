@@ -126,7 +126,7 @@ public class VisorManualActivity extends AppCompatActivity {
             int index = contenidoLower.indexOf(palabraLower);
             while (index >= 0) {
                 spannable.setSpan(
-                        new BackgroundColorSpan(Color.YELLOW),
+                        new BackgroundColorSpan(Color.parseColor("#90CA44")),
                         index,
                         index + palabra.length(),
                         Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
