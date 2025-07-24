@@ -174,7 +174,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             } catch (ApiException e) {
                 Toast.makeText(this, "Error al iniciar sesión", Toast.LENGTH_SHORT).show();
-                Log.e(TAG, "Error completo al iniciar sesión: " + e.toString()); // ¡Este debe aparecer!
+                Log.e(TAG, "Error completo al iniciar sesión: " + e.toString());
                 e.printStackTrace(); // Fuerza la impresión en LogCat
             }
         }
