@@ -5,69 +5,85 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- AppBarLayout con Toolbar y barra de búsqueda -->
+    <!-- AppBarLayout con Toolbar personalizada -->
     <com.google.android.material.appbar.AppBarLayout
-        android:id="@+id/appbar"
+        android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:theme="@style/ThemeOverlay.MaterialComponents.Dark.ActionBar"
-        android:background="?attr/colorPrimary">
+        android:layout_height="80dp"
+        android:background="#6AEBA4"
+        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar">
 
-        <!-- Toolbar -->
-        <com.google.android.material.appbar.MaterialToolbar
+        <androidx.appcompat.widget.Toolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="?attr/actionBarSize"
-            app:titleTextColor="@android:color/white"
-            android:paddingTop="24dp" />
+            android:layout_height="?attr/actionBarSize"
+            android:background="#6AEBA4"
+            android:gravity="center"
+            app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
+            android:layout_marginTop="24dp" >
 
-        <!-- Barra de búsqueda -->
-        <LinearLayout
-            android:id="@+id/searchNavigationLayout"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:padding="8dp"
-            android:visibility="gone"
-            android:background="?attr/colorPrimary">
+            <!-- Contenedor horizontal dentro del Toolbar -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="8dp"
+                android:paddingTop="12dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="4dp">
 
-            <TextView
-                android:id="@+id/resultCounter"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="0/0 resultados"
-                android:textColor="@android:color/white" />
+                <Button
+                    android:id="@+id/btnPrev"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:text="⟨"
+                    android:textAllCaps="false" />
 
-            <Button
-                android:id="@+id/prevButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Anterior" />
+                <TextView
+                    android:id="@+id/tvPageIndicator"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="Página 0 / 0"
+                    android:textColor="@android:color/black"
+                    android:textStyle="bold" />
 
-            <Button
-                android:id="@+id/nextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Siguiente" />
-        </LinearLayout>
+                <Button
+                    android:id="@+id/btnNext"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="⟩"
+                    android:textAllCaps="false" />
+            </LinearLayout>
+
+        </androidx.appcompat.widget.Toolbar>
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- Contenido desplazable -->
-    <ScrollView
-        android:id="@+id/scrollView"
+    <!-- Contenido principal -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:orientation="vertical"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-        <TextView
-            android:id="@+id/texto_manual"
+        <!-- Contenedor del visor PDF -->
+        <FrameLayout
+            android:id="@+id/pdfContainer"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:padding="16dp"
-            android:textSize="16sp"
-            android:textColor="@android:color/white" />
-    </ScrollView>
+            android:layout_height="match_parent"
+            android:background="#FFFFFF">
+
+            <ImageView
+                android:id="@+id/pdfImageView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="Página del PDF"
+                android:scaleType="fitCenter" />
+        </FrameLayout>
+    </LinearLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

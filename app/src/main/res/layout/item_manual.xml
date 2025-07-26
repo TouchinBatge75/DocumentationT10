@@ -20,14 +20,5 @@
         />
 
     <!-- Download or open button -->
-    <Button
-        android:id="@+id/estado_manual"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Descargar"
-        android:textSize="14sp"
-        android:textColor="#000000"
-        android:paddingLeft="8dp"
-        />
 
 </LinearLayout>

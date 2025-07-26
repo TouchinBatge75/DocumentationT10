@@ -50,36 +50,13 @@ public class ManualAdapter extends BaseAdapter
             convertView=LayoutInflater.from(context).inflate(R.layout.item_manual, parent, false);
         }
         TextView nombreManual= convertView.findViewById(R.id.nombre_manual);
-        TextView estadoManual = convertView.findViewById(R.id.estado_manual);
+
 
         //Obtenemos manual actual
         Manual manual = listaManuales.get(position);
 
         //Verificamos si ya tenemos el arrchivo descargado localmente
         File archivo = new File(context.getFilesDir(), manual.Nombre+".pdf");
-
-        if(archivo.exists())
-        {
-            estadoManual.setText("Abrir");
-            estadoManual.setTextColor(0xFF2E7D32);//verde;
-        }
-        else
-        {
-            estadoManual.setText("Descargar");
-            estadoManual.setTextColor(0xFF1565C0);//Azul;
-        }
-
-        estadoManual.setOnClickListener(v -> {
-            if (!archivo.exists()) {
-                // Si el archivo no existe, lo descargamos
-                descargarManual(manual, estadoManual);
-            } else {
-                Toast.makeText(context, "Manual ya descargado", Toast.LENGTH_SHORT).show();
-                Intent intent = new Intent(context, VisorManualActivity.class);
-                intent.putExtra(VisorManualActivity.EXTRA_MANUAL_PATH, archivo.getAbsolutePath());
-                context.startActivity(intent);
-            }
-        });
 
 
         return convertView;
