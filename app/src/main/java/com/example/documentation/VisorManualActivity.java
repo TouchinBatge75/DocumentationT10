@@ -17,6 +17,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 
 import java.io.File;
 import java.io.IOException;
@@ -47,12 +48,15 @@ public class VisorManualActivity extends AppCompatActivity {
         setContentView(R.layout.activity_visor_manual);
 
         // Configuración de la Toolbar
-        androidx.appcompat.widget.Toolbar toolbar = findViewById(R.id.toolbar);
+        Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
+
+// Muestra la flecha de regresar
         if (getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayShowTitleEnabled(false);
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true); // ← muestra la flecha
+            getSupportActionBar().setDisplayShowHomeEnabled(true); // ← opcional
         }
+
         toolbar.setNavigationOnClickListener(v -> finish());
 
         // Inicialización de vistas
@@ -226,9 +230,17 @@ public class VisorManualActivity extends AppCompatActivity {
     private void imprimirPDF() {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
             PrintManager printManager = (PrintManager) getSystemService(PRINT_SERVICE);
+
             if (printManager != null && rutaArchivo != null) {
                 PrintDocumentAdapter printAdapter = new PdfDocumentAdapter(this, rutaArchivo);
-                printManager.print("Documentación", printAdapter, new PrintAttributes.Builder().build());
+
+                PrintAttributes printAttributes = new PrintAttributes.Builder()
+                        .setMediaSize(PrintAttributes.MediaSize.NA_LETTER)
+                        .setColorMode(PrintAttributes.COLOR_MODE_COLOR)
+                        .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
+                        .build();
+
+                printManager.print("Documentación", printAdapter, printAttributes);
             } else {
                 Toast.makeText(this, "Servicio de impresión no disponible", Toast.LENGTH_SHORT).show();
             }
@@ -236,4 +248,5 @@ public class VisorManualActivity extends AppCompatActivity {
             Toast.makeText(this, "Impresión no soportada en esta versión de Android", Toast.LENGTH_SHORT).show();
         }
     }
+
 }
