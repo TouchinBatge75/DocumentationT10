@@ -2,88 +2,119 @@
 <androidx.coordinatorlayout.widget.CoordinatorLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true">
 
-    <!-- AppBarLayout con Toolbar personalizada -->
+    <!-- AppBar con Toolbar y controles -->
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
-        android:layout_height="80dp"
-        android:background="#6AEBA4"
-        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar">
 
-        <androidx.appcompat.widget.Toolbar
+        android:layout_height="wrap_content"
+        android:theme="@style/ThemeOverlay.MaterialComponents.Dark.ActionBar">
+
+        <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
+            android:backgroundTint="#6AEBA4"
+            app:titleTextColor="@android:color/white"
+            app:navigationIcon="@drawable/ic_arrow_back" />
+
+        <!-- Controles de navegación y zoom -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="8dp"
             android:background="#6AEBA4"
-            android:gravity="center"
-            app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
-            android:layout_marginTop="24dp" >
+            android:gravity="center_vertical">
 
-            <!-- Contenedor horizontal dentro del Toolbar -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingStart="8dp"
-                android:paddingTop="12dp"
-                android:paddingEnd="8dp"
-                android:paddingBottom="4dp">
 
-                <Button
-                    android:id="@+id/btnPrev"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:text="⟨"
-                    android:textAllCaps="false" />
 
-                <TextView
-                    android:id="@+id/tvPageIndicator"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:text="Página 0 / 0"
-                    android:textColor="@android:color/black"
-                    android:textStyle="bold" />
+            <Button
+                android:id="@+id/btnPrev"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Anterior"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:textColor="@android:color/black"
+                android:layout_marginHorizontal="8dp"/>
+            <Button
+                android:id="@+id/btnZoomOut"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="-"
+                android:textSize="18sp"
+                android:minWidth="48dp"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:textColor="@android:color/black"/>
+            <TextView
+                android:id="@+id/tvPageIndicator"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Página 1/1"
+                android:textColor="@android:color/black"
+                android:gravity="center"
+                android:textAppearance="@style/TextAppearance.MaterialComponents.Caption"/>
 
-                <Button
-                    android:id="@+id/btnNext"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:text="⟩"
-                    android:textAllCaps="false" />
-            </LinearLayout>
+            <Button
+                android:id="@+id/btnZoomIn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="+"
+                android:textSize="18sp"
+                android:minWidth="48dp"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:textColor="@android:color/black"/>
+            <Button
+                android:id="@+id/btnNext"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Siguiente"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:textColor="@android:color/black"
+                android:layout_marginHorizontal="8dp"/>
 
-        </androidx.appcompat.widget.Toolbar>
+
+        </LinearLayout>
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- Contenido principal -->
-    <LinearLayout
+    <!-- Área principal del visor PDF -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-        <!-- Contenedor del visor PDF -->
-        <FrameLayout
-            android:id="@+id/pdfContainer"
+        <ScrollView
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="#FFFFFF">
+            android:fillViewport="true">
 
-            <ImageView
-                android:id="@+id/pdfImageView"
+            <HorizontalScrollView
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:contentDescription="Página del PDF"
-                android:scaleType="fitCenter" />
-        </FrameLayout>
-    </LinearLayout>
+                android:fillViewport="true">
 
+                <ImageView
+                    android:id="@+id/pdfImageView"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:adjustViewBounds="true"
+                    android:scaleType="fitCenter"
+                    />
+            </HorizontalScrollView>
+        </ScrollView>
+
+        <!-- Mensaje de carga (opcional) -->
+        <ProgressBar
+            android:id="@+id/progressBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:visibility="gone"/>
+    </FrameLayout>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

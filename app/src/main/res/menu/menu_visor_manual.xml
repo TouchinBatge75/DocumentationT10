@@ -2,21 +2,9 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
-        android:id="@+id/action_text_increase"
-        android:title="Acercar"
-        android:icon="@drawable/ic_zoom_in"
-        app:showAsAction="ifRoom" />
+        android:id="@+id/action_print"
+        android:title="Imprimir"
 
-    <item
-        android:id="@+id/action_text_decrease"
-        android:title="Alejar"
-        android:icon="@drawable/ic_zoom_out"
+        android:icon="@drawable/ic_print"
         app:showAsAction="ifRoom" />
-
-    <item
-        android:id="@+id/action_search"
-        android:title="Buscar"
-        android:icon="@android:drawable/ic_menu_search"
-        app:showAsAction="ifRoom|collapseActionView"
-        app:actionViewClass="androidx.appcompat.widget.SearchView" />
 </menu>

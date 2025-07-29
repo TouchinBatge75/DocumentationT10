@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="MyToolbarStyle" parent="Widget.MaterialComponents.Toolbar.Primary">
+        <item name="android:background">#6AEBA4</item>
+        <item name="titleTextColor">@android:color/white</item>
+    </style>
+</resources>
