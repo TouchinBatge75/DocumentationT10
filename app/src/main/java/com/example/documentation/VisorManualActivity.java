@@ -13,6 +13,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Button;
 import android.widget.ImageView;
+import androidx.appcompat.widget.SearchView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -30,6 +31,7 @@ public class VisorManualActivity extends AppCompatActivity {
     private Button btnPrev, btnNext, btnZoomIn, btnZoomOut;
     private TextView tvPageIndicator;
 
+    private String textoCompletoPdf;
     private PdfRenderer pdfRenderer;
     private PdfRenderer.Page currentPage;
     private ParcelFileDescriptor parcelFileDescriptor;
@@ -47,22 +49,17 @@ public class VisorManualActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_visor_manual);
 
-        // Configuración de la Toolbar
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
-// Muestra la flecha de regresar
         if (getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true); // ← muestra la flecha
-            getSupportActionBar().setDisplayShowHomeEnabled(true); // ← opcional
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            getSupportActionBar().setDisplayShowHomeEnabled(true);
         }
 
         toolbar.setNavigationOnClickListener(v -> finish());
 
-        // Inicialización de vistas
         initViews();
-
-        // Cargar el PDF
         cargarPDF();
     }
 
@@ -74,7 +71,6 @@ public class VisorManualActivity extends AppCompatActivity {
         btnZoomOut = findViewById(R.id.btnZoomOut);
         tvPageIndicator = findViewById(R.id.tvPageIndicator);
 
-        // Configuración de listeners
         btnPrev.setOnClickListener(v -> mostrarPaginaAnterior());
         btnNext.setOnClickListener(v -> mostrarPaginaSiguiente());
         btnZoomIn.setOnClickListener(v -> aplicarZoom(true));
@@ -91,19 +87,27 @@ public class VisorManualActivity extends AppCompatActivity {
                     abrirRenderer(file);
                     pageCount = pdfRenderer.getPageCount();
 
-                    // Calcular escala inicial basada en el ancho de pantalla
                     DisplayMetrics displayMetrics = new DisplayMetrics();
                     getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
                     int screenWidth = displayMetrics.widthPixels;
 
-                    // Abrir página temporalmente para obtener dimensiones
                     PdfRenderer.Page firstPage = pdfRenderer.openPage(0);
                     minScale = (float) screenWidth / firstPage.getWidth();
-                    maxScale = minScale * 3.0f; // Zoom máximo 3x el tamaño ajustado
-                    scaleFactor = minScale; // Establecer escala inicial
+                    maxScale = minScale * 3.0f;
+                    scaleFactor = minScale;
                     firstPage.close();
 
                     mostrarPagina(currentPageIndex);
+                    new Thread(() -> {
+                        ExtractorPDF extractor = new ExtractorPDF(this);
+                        try {
+                            textoCompletoPdf = extractor.extractText(file);
+                            runOnUiThread(() -> Toast.makeText(this, "Texto cargado para búsqueda", Toast.LENGTH_SHORT).show());
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                            runOnUiThread(() -> Toast.makeText(this, "Error al cargar texto para búsqueda", Toast.LENGTH_SHORT).show());
+                        }
+                    }).start();
                 } catch (IOException e) {
                     manejarError("Error al abrir PDF", e);
                 }
@@ -127,15 +131,12 @@ public class VisorManualActivity extends AppCompatActivity {
             return;
         }
 
-        // Cerrar página actual si existe
         if (currentPage != null) {
             currentPage.close();
         }
 
         try {
             currentPage = pdfRenderer.openPage(index);
-
-            // Calcular dimensiones ajustadas
             int width = (int) (currentPage.getWidth() * scaleFactor);
             int height = (int) (currentPage.getHeight() * scaleFactor);
 
@@ -146,7 +147,6 @@ public class VisorManualActivity extends AppCompatActivity {
             pdfImageView.setImageBitmap(bitmap);
             tvPageIndicator.setText(String.format("Página %d / %d", index + 1, pageCount));
 
-            // Actualizar estado de los botones
             btnPrev.setEnabled(index > 0);
             btnNext.setEnabled(index < pageCount - 1);
             btnZoomOut.setEnabled(scaleFactor > minScale);
@@ -158,11 +158,8 @@ public class VisorManualActivity extends AppCompatActivity {
     }
 
     private void aplicarZoom(boolean zoomIn) {
-        if (zoomIn) {
-            scaleFactor = Math.min(scaleFactor + SCALE_STEP, maxScale);
-        } else {
-            scaleFactor = Math.max(scaleFactor - SCALE_STEP, minScale);
-        }
+        scaleFactor = zoomIn ? Math.min(scaleFactor + SCALE_STEP, maxScale)
+                : Math.max(scaleFactor - SCALE_STEP, minScale);
         mostrarPagina(currentPageIndex);
     }
 
@@ -177,6 +174,81 @@ public class VisorManualActivity extends AppCompatActivity {
         if (currentPageIndex < pageCount - 1) {
             currentPageIndex++;
             mostrarPagina(currentPageIndex);
+        }
+    }
+
+    private void buscarPalabraEnPdf(String palabraClave) {
+        if (textoCompletoPdf != null && palabraClave != null && !palabraClave.isEmpty()) {
+            new Thread(() -> {
+                try {
+                    ExtractorPDF extractor = new ExtractorPDF(this);
+                    int pagina = extractor.buscarPaginaQueContiene(palabraClave, rutaArchivo);
+                    runOnUiThread(() -> {
+                        if (pagina >= 0) {
+                            Toast.makeText(this, "Palabra encontrada en página " + (pagina + 1), Toast.LENGTH_SHORT).show();
+                            currentPageIndex = pagina;  // Actualiza índice actual
+                            mostrarPagina(pagina);      // Muestra la página con la palabra
+                        } else {
+                            Toast.makeText(this, "No se encontró la palabra", Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    runOnUiThread(() -> Toast.makeText(this, "Error al buscar palabra", Toast.LENGTH_SHORT).show());
+                }
+            }).start();
+        }
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_visor_manual, menu);
+
+        MenuItem searchItem = menu.findItem(R.id.action_search);
+        SearchView searchView = (SearchView) searchItem.getActionView();
+        searchView.setQueryHint("Buscar en el PDF...");
+
+        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                buscarPalabraEnPdf(query);
+                return true;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                return false;
+            }
+        });
+
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == R.id.action_print) {
+            imprimirPDF();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    private void imprimirPDF() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
+            PrintManager printManager = (PrintManager) getSystemService(PRINT_SERVICE);
+            if (printManager != null && rutaArchivo != null) {
+                PrintDocumentAdapter printAdapter = new PdfDocumentAdapter(this, rutaArchivo);
+                PrintAttributes printAttributes = new PrintAttributes.Builder()
+                        .setMediaSize(PrintAttributes.MediaSize.NA_LETTER)
+                        .setColorMode(PrintAttributes.COLOR_MODE_COLOR)
+                        .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
+                        .build();
+                printManager.print("Documentación", printAdapter, printAttributes);
+            } else {
+                Toast.makeText(this, "Servicio de impresión no disponible", Toast.LENGTH_SHORT).show();
+            }
+        } else {
+            Toast.makeText(this, "Impresión no soportada en esta versión de Android", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -210,43 +282,4 @@ public class VisorManualActivity extends AppCompatActivity {
         Toast.makeText(this, mensaje, Toast.LENGTH_LONG).show();
         finish();
     }
-
-    // Menú e impresión
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.menu_visor_manual, menu);
-        return true;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == R.id.action_print) {
-            imprimirPDF();
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
-    }
-
-    private void imprimirPDF() {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
-            PrintManager printManager = (PrintManager) getSystemService(PRINT_SERVICE);
-
-            if (printManager != null && rutaArchivo != null) {
-                PrintDocumentAdapter printAdapter = new PdfDocumentAdapter(this, rutaArchivo);
-
-                PrintAttributes printAttributes = new PrintAttributes.Builder()
-                        .setMediaSize(PrintAttributes.MediaSize.NA_LETTER)
-                        .setColorMode(PrintAttributes.COLOR_MODE_COLOR)
-                        .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
-                        .build();
-
-                printManager.print("Documentación", printAdapter, printAttributes);
-            } else {
-                Toast.makeText(this, "Servicio de impresión no disponible", Toast.LENGTH_SHORT).show();
-            }
-        } else {
-            Toast.makeText(this, "Impresión no soportada en esta versión de Android", Toast.LENGTH_SHORT).show();
-        }
-    }
-
 }

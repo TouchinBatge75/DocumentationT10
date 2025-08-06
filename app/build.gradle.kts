@@ -49,10 +49,7 @@ dependencies {
     implementation("androidx.constraintlayout:constraintlayout:2.2.1")
     implementation ("com.google.code.gson:gson:2.10.1")
 
-
-
-
-
+    implementation ("com.tom-roush:pdfbox-android:2.0.27.0")
 
     implementation("com.google.android.gms:play-services-auth:21.0.0")
     implementation("com.google.apis:google-api-services-drive:v3-rev20250701-2.0.0")
