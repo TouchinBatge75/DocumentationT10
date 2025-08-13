@@ -23,12 +23,18 @@ import androidx.appcompat.widget.Toolbar;
 import java.io.File;
 import java.io.IOException;
 
+import android.view.GestureDetector;
+import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
+
+
 public class VisorManualActivity extends AppCompatActivity {
 
     public static final String EXTRA_MANUAL_PATH = "manual_path";
-
+    private GestureDetector gestureDetector;
+    private ScaleGestureDetector scaleGestureDetector;
     private ImageView pdfImageView;
-    private Button btnPrev, btnNext, btnZoomIn, btnZoomOut;
+    private Button btnPrev, btnNext;
     private TextView tvPageIndicator;
 
     private String textoCompletoPdf;
@@ -43,6 +49,7 @@ public class VisorManualActivity extends AppCompatActivity {
     private float minScale = 1.0f;
     private float maxScale = 3.0f;
     private String rutaArchivo;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,22 +66,40 @@ public class VisorManualActivity extends AppCompatActivity {
 
         toolbar.setNavigationOnClickListener(v -> finish());
 
-        initViews();
+        initViews(); //
+
+        gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public boolean onSingleTapUp(MotionEvent e) {
+                float x = e.getX();
+                int width = pdfImageView.getWidth();
+
+                if (x < width / 3f) mostrarPaginaAnterior();
+                else if (x > (width * 2f / 3f)) mostrarPaginaSiguiente();
+
+                return true;
+            }
+        });
+
+        pdfImageView.setOnTouchListener((v, event) -> {
+            gestureDetector.onTouchEvent(event);
+            return true;
+        });
+
         cargarPDF();
     }
+
 
     private void initViews() {
         pdfImageView = findViewById(R.id.pdfImageView);
         btnPrev = findViewById(R.id.btnPrev);
         btnNext = findViewById(R.id.btnNext);
-        btnZoomIn = findViewById(R.id.btnZoomIn);
-        btnZoomOut = findViewById(R.id.btnZoomOut);
+
         tvPageIndicator = findViewById(R.id.tvPageIndicator);
 
         btnPrev.setOnClickListener(v -> mostrarPaginaAnterior());
         btnNext.setOnClickListener(v -> mostrarPaginaSiguiente());
-        btnZoomIn.setOnClickListener(v -> aplicarZoom(true));
-        btnZoomOut.setOnClickListener(v -> aplicarZoom(false));
+
     }
 
     private void cargarPDF() {
@@ -137,10 +162,10 @@ public class VisorManualActivity extends AppCompatActivity {
 
         try {
             currentPage = pdfRenderer.openPage(index);
-            int width = (int) (currentPage.getWidth() * scaleFactor);
-            int height = (int) (currentPage.getHeight() * scaleFactor);
-
+            int width = currentPage.getWidth();
+            int height = currentPage.getHeight();
             Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+
             bitmap.eraseColor(Color.WHITE);
             currentPage.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
 
@@ -149,8 +174,7 @@ public class VisorManualActivity extends AppCompatActivity {
 
             btnPrev.setEnabled(index > 0);
             btnNext.setEnabled(index < pageCount - 1);
-            btnZoomOut.setEnabled(scaleFactor > minScale);
-            btnZoomIn.setEnabled(scaleFactor < maxScale);
+
 
         } catch (Exception e) {
             manejarError("Error al mostrar página", e);

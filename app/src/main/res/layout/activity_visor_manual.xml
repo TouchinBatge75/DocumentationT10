@@ -42,15 +42,7 @@
                 style="@style/Widget.MaterialComponents.Button.TextButton"
                 android:textColor="@android:color/black"
                 android:layout_marginHorizontal="8dp"/>
-            <Button
-                android:id="@+id/btnZoomOut"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="-"
-                android:textSize="18sp"
-                android:minWidth="48dp"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:textColor="@android:color/black"/>
+
             <TextView
                 android:id="@+id/tvPageIndicator"
                 android:layout_width="0dp"
@@ -61,15 +53,7 @@
                 android:gravity="center"
                 android:textAppearance="@style/TextAppearance.MaterialComponents.Caption"/>
 
-            <Button
-                android:id="@+id/btnZoomIn"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="+"
-                android:textSize="18sp"
-                android:minWidth="48dp"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:textColor="@android:color/black"/>
+
             <Button
                 android:id="@+id/btnNext"
                 android:layout_width="wrap_content"
@@ -89,25 +73,14 @@
         android:layout_height="match_parent"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-        <ScrollView
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:fillViewport="true">
 
-            <HorizontalScrollView
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:fillViewport="true">
-
-                <ImageView
+                <com.github.chrisbanes.photoview.PhotoView
                     android:id="@+id/pdfImageView"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
                     android:adjustViewBounds="true"
-                    android:scaleType="fitCenter"
-                    />
-            </HorizontalScrollView>
-        </ScrollView>
+                    android:scaleType="fitCenter" />
+
 
         <!-- Mensaje de carga (opcional) -->
         <ProgressBar
