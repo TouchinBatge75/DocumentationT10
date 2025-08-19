@@ -48,15 +48,14 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
+
+//Cuenta donde se guardan los manuales: manuales615@gmail.com - M@nuales975
 public class MainActivity extends AppCompatActivity {
 
     private static final int RC_SIGN_IN = 1000;
     private static final String TAG = "MainActivity";
     private GoogleSignInClient mGoogleSignInClient;
     private Drive mDriveService;
-
-
-
     private ListView listView;
     private ArrayAdapter<String> adapter;
     private List<String> nombres = new ArrayList<>();
@@ -195,7 +194,7 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "Servicio de Drive inicializado correctamente.");
 
         // ID puro de la carpeta (sin "?usp=sharing")
-        String folderId = "1QnkCbJVWy6GwdX-zSxgNQL1KiIWUsdNH";
+        String folderId = "11a5MPz8K1vFk7HhblB3DGW21CTRZn-uW";
 
         new Thread(() -> {
             try {

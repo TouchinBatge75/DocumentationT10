@@ -1,5 +1,6 @@
 package com.example.documentation;
 
+import android.annotation.SuppressLint;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.pdf.PdfRenderer;
@@ -27,30 +28,34 @@ import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 
+import com.github.chrisbanes.photoview.PhotoView;
 
 public class VisorManualActivity extends AppCompatActivity {
 
     public static final String EXTRA_MANUAL_PATH = "manual_path";
     private GestureDetector gestureDetector;
     private ScaleGestureDetector scaleGestureDetector;
-    private ImageView pdfImageView;
+    private PhotoView pdfImageView;
+
     private Button btnPrev, btnNext;
     private TextView tvPageIndicator;
 
     private String textoCompletoPdf;
     private PdfRenderer pdfRenderer;
-    private PdfRenderer.Page currentPage;
+    private PdfRenderer.Page currentPage; // Cambiado el nombre para consistencia
     private ParcelFileDescriptor parcelFileDescriptor;
 
     private int currentPageIndex = 0;
     private int pageCount = 0;
     private float scaleFactor = 1.0f;
     private final float SCALE_STEP = 0.2f;
+
+    // Variables corregidas - eliminadas las duplicadas
     private float minScale = 1.0f;
     private float maxScale = 3.0f;
     private String rutaArchivo;
 
-
+    @SuppressLint("ClickableViewAccessibility")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -66,40 +71,29 @@ public class VisorManualActivity extends AppCompatActivity {
 
         toolbar.setNavigationOnClickListener(v -> finish());
 
-        initViews(); //
+        initViews();
+        cargarPDF();
 
-        gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
-            @Override
-            public boolean onSingleTapUp(MotionEvent e) {
-                float x = e.getX();
-                int width = pdfImageView.getWidth();
+        // Listener para detectar taps en tercios de la pantalla
+        pdfImageView.setOnViewTapListener((view, x, y) -> {
+            int width = view.getWidth();
 
-                if (x < width / 3f) mostrarPaginaAnterior();
-                else if (x > (width * 2f / 3f)) mostrarPaginaSiguiente();
-
-                return true;
+            if (x < width / 3f) {
+                mostrarPaginaAnterior();
+            } else if (x > (width * 2f / 3f)) {
+                mostrarPaginaSiguiente();
             }
         });
-
-        pdfImageView.setOnTouchListener((v, event) -> {
-            gestureDetector.onTouchEvent(event);
-            return true;
-        });
-
-        cargarPDF();
     }
-
 
     private void initViews() {
         pdfImageView = findViewById(R.id.pdfImageView);
         btnPrev = findViewById(R.id.btnPrev);
         btnNext = findViewById(R.id.btnNext);
-
         tvPageIndicator = findViewById(R.id.tvPageIndicator);
 
         btnPrev.setOnClickListener(v -> mostrarPaginaAnterior());
         btnNext.setOnClickListener(v -> mostrarPaginaSiguiente());
-
     }
 
     private void cargarPDF() {
@@ -112,6 +106,9 @@ public class VisorManualActivity extends AppCompatActivity {
                     abrirRenderer(file);
                     pageCount = pdfRenderer.getPageCount();
 
+                    // Actualizar el indicador de página
+                    actualizarIndicadorPagina();
+
                     DisplayMetrics displayMetrics = new DisplayMetrics();
                     getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
                     int screenWidth = displayMetrics.widthPixels;
@@ -123,16 +120,18 @@ public class VisorManualActivity extends AppCompatActivity {
                     firstPage.close();
 
                     mostrarPagina(currentPageIndex);
+
+                    // Extraer texto en segundo plano para búsqueda
                     new Thread(() -> {
                         ExtractorPDF extractor = new ExtractorPDF(this);
                         try {
                             textoCompletoPdf = extractor.extractText(file);
-                            runOnUiThread(() -> Toast.makeText(this, "Texto cargado para búsqueda", Toast.LENGTH_SHORT).show());
                         } catch (IOException e) {
                             e.printStackTrace();
                             runOnUiThread(() -> Toast.makeText(this, "Error al cargar texto para búsqueda", Toast.LENGTH_SHORT).show());
                         }
                     }).start();
+
                 } catch (IOException e) {
                     manejarError("Error al abrir PDF", e);
                 }
@@ -152,52 +151,54 @@ public class VisorManualActivity extends AppCompatActivity {
     }
 
     private void mostrarPagina(int index) {
-        if (pdfRenderer == null || index < 0 || index >= pdfRenderer.getPageCount()) {
-            return;
-        }
-
-        if (currentPage != null) {
-            currentPage.close();
-        }
+        if (index < 0 || index >= pageCount) return;
 
         try {
-            currentPage = pdfRenderer.openPage(index);
-            int width = currentPage.getWidth();
-            int height = currentPage.getHeight();
-            Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            if (currentPage != null) {
+                currentPage.close();
+            }
 
-            bitmap.eraseColor(Color.WHITE);
+            currentPage = pdfRenderer.openPage(index);
+
+            Bitmap bitmap = Bitmap.createBitmap(
+                    currentPage.getWidth(),
+                    currentPage.getHeight(),
+                    Bitmap.Config.ARGB_8888
+            );
+
+            // Renderizar la página en el bitmap
+            bitmap.eraseColor(Color.WHITE); // Fondo blanco
             currentPage.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
 
             pdfImageView.setImageBitmap(bitmap);
-            tvPageIndicator.setText(String.format("Página %d / %d", index + 1, pageCount));
 
-            btnPrev.setEnabled(index > 0);
-            btnNext.setEnabled(index < pageCount - 1);
+            // Resetear zoom al cambiar de página
+            pdfImageView.setScale(1.0f, false);
 
+            currentPageIndex = index;
+            actualizarIndicadorPagina();
 
         } catch (Exception e) {
-            manejarError("Error al mostrar página", e);
+            e.printStackTrace();
+            Toast.makeText(this, "Error al mostrar página", Toast.LENGTH_SHORT).show();
         }
     }
 
-    private void aplicarZoom(boolean zoomIn) {
-        scaleFactor = zoomIn ? Math.min(scaleFactor + SCALE_STEP, maxScale)
-                : Math.max(scaleFactor - SCALE_STEP, minScale);
-        mostrarPagina(currentPageIndex);
+    private void actualizarIndicadorPagina() {
+        if (tvPageIndicator != null) {
+            tvPageIndicator.setText((currentPageIndex + 1) + " / " + pageCount);
+        }
     }
 
     private void mostrarPaginaAnterior() {
         if (currentPageIndex > 0) {
-            currentPageIndex--;
-            mostrarPagina(currentPageIndex);
+            mostrarPagina(currentPageIndex - 1);
         }
     }
 
     private void mostrarPaginaSiguiente() {
         if (currentPageIndex < pageCount - 1) {
-            currentPageIndex++;
-            mostrarPagina(currentPageIndex);
+            mostrarPagina(currentPageIndex + 1);
         }
     }
 
@@ -210,8 +211,7 @@ public class VisorManualActivity extends AppCompatActivity {
                     runOnUiThread(() -> {
                         if (pagina >= 0) {
                             Toast.makeText(this, "Palabra encontrada en página " + (pagina + 1), Toast.LENGTH_SHORT).show();
-                            currentPageIndex = pagina;  // Actualiza índice actual
-                            mostrarPagina(pagina);      // Muestra la página con la palabra
+                            mostrarPagina(pagina);
                         } else {
                             Toast.makeText(this, "No se encontró la palabra", Toast.LENGTH_SHORT).show();
                         }
