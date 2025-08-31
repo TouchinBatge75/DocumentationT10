@@ -20,10 +20,28 @@
     <TextView
         android:id="@+id/tituloApp"
         android:layout_width="314dp"
-        android:layout_height="173dp"
+        android:layout_height="76dp"
         android:gravity="center"
-        android:text="Documentacion\n Fundacion Dr. Hernandez Zurita"
+        android:text="Documentación\n"
         android:textColor="#FFFFFF"
-        android:textSize="30sp"
+        android:textSize="40sp"
+        android:textStyle="bold" />
+    <TextView
+        android:id="@+id/tituloApp2"
+        android:layout_width="314dp"
+        android:layout_height="70dp"
+        android:gravity="center"
+        android:text="Fundación"
+        android:textColor="#FFFFFF"
+        android:textSize="50sp"
+        android:textStyle="bold" />
+    <TextView
+        android:id="@+id/tituloApp3"
+        android:layout_width="314dp"
+        android:layout_height="70dp"
+        android:gravity="center"
+        android:text="Doctor Hernández Zurita, I.B.P."
+        android:textColor="#FFFFFF"
+        android:textSize="25sp"
         android:textStyle="bold" />
 </LinearLayout>

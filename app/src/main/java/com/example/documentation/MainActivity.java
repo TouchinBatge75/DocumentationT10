@@ -4,16 +4,18 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.View;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
+import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.ListView;
+import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.annotation.Nullable;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
@@ -40,14 +42,11 @@ import java.io.IOException;
 
 import com.google.gson.Gson;
 
-
-import java.io.OutputStream;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-
 
 //Cuenta donde se guardan los manuales: manuales615@gmail.com - M@nuales975
 public class MainActivity extends AppCompatActivity {
@@ -56,8 +55,8 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
     private GoogleSignInClient mGoogleSignInClient;
     private Drive mDriveService;
-    private ListView listView;
-    private ArrayAdapter<String> adapter;
+    private RecyclerView recyclerView;
+    private ManualAdapter adapter;
     private List<String> nombres = new ArrayList<>();
 
     @Override
@@ -65,49 +64,14 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Inicializar ListView y adaptador
-        listView = findViewById(R.id.lista_manuales);
-        adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, nombres);
-        listView.setAdapter(adapter);
+        // Inicializar RecyclerView
+        recyclerView = findViewById(R.id.rv_manuales);
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+
+        adapter = new ManualAdapter(nombres);
+        recyclerView.setAdapter(adapter);
 
         cargarManualesLocales();
-
-        listView.setOnItemClickListener((parent, view, position, id) -> {
-            String nombreManual = nombres.get(position);
-            java.io.File archivoManual = new java.io.File(getFilesDir(), "Manuales/" + nombreManual);
-
-            if (archivoManual.exists()) {
-                Intent intent = new Intent(MainActivity.this, VisorManualActivity.class);
-                intent.putExtra(VisorManualActivity.EXTRA_MANUAL_PATH, archivoManual.getAbsolutePath());
-                startActivity(intent);
-            } else {
-                Toast.makeText(MainActivity.this, "Archivo no encontrado: " + nombreManual, Toast.LENGTH_SHORT).show();
-            }
-        });
-
-        listView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
-            @Override
-            public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
-                String nombreArchivo = adapter.getItem(position);
-
-                new AlertDialog.Builder(MainActivity.this)
-                        .setTitle("Eliminar manual")
-                        .setMessage("¿Deseas eliminar \"" + nombreArchivo + "\"?")
-                        .setPositiveButton("Eliminar", new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int which) {
-                                eliminarManual(nombreArchivo);
-                            }
-                        })
-                        .setNegativeButton("Cancelar", null)
-                        .show();
-
-                return true;
-            }
-        });
-
-
-
-
 
         // Configurar opciones de Google Sign-In
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -117,20 +81,89 @@ public class MainActivity extends AppCompatActivity {
 
         mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
 
-        // Asignar acción al botón
+        // Asignar acción al botón de descargar
         Button btnDescargar = findViewById(R.id.btn_descargar_manuales);
         btnDescargar.setOnClickListener(view -> iniciarAutenticacionGoogle());
+
+        // Asignar acción al botón de búsqueda (puedes implementar la funcionalidad)
+        Button btnBuscar = findViewById(R.id.btn_search_manual);
+        btnBuscar.setOnClickListener(view -> {
+            Toast.makeText(this, "Funcionalidad de búsqueda por implementar", Toast.LENGTH_SHORT).show();
+        });
+    }
+
+    // Adaptador para RecyclerView
+    private class ManualAdapter extends RecyclerView.Adapter<ManualAdapter.ViewHolder> {
+        private List<String> manuales;
+
+        public ManualAdapter(List<String> manuales) {
+            this.manuales = manuales;
+        }
+
+        @NonNull
+        @Override
+        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            View view = LayoutInflater.from(parent.getContext())
+                    .inflate(android.R.layout.simple_list_item_1, parent, false);
+            return new ViewHolder(view);
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+            String nombreManual = manuales.get(position);
+            holder.textView.setText(nombreManual);
+
+            holder.itemView.setOnClickListener(v -> {
+                java.io.File archivoManual = new java.io.File(getFilesDir(), "Manuales/" + nombreManual);
+                if (archivoManual.exists()) {
+                    Intent intent = new Intent(MainActivity.this, VisorManualActivity.class);
+                    intent.putExtra(VisorManualActivity.EXTRA_MANUAL_PATH, archivoManual.getAbsolutePath());
+                    startActivity(intent);
+                } else {
+                    Toast.makeText(MainActivity.this, "Archivo no encontrado: " + nombreManual, Toast.LENGTH_SHORT).show();
+                }
+            });
+
+            holder.itemView.setOnLongClickListener(v -> {
+                new AlertDialog.Builder(MainActivity.this)
+                        .setTitle("Eliminar manual")
+                        .setMessage("¿Deseas eliminar \"" + nombreManual + "\"?")
+                        .setPositiveButton("Eliminar", (dialog, which) -> eliminarManual(nombreManual))
+                        .setNegativeButton("Cancelar", null)
+                        .show();
+                return true;
+            });
+        }
+
+        @Override
+        public int getItemCount() {
+            return manuales.size();
+        }
+
+        public void updateData(List<String> nuevosManuales) {
+            manuales.clear();
+            manuales.addAll(nuevosManuales);
+            notifyDataSetChanged();
+        }
+
+        public class ViewHolder extends RecyclerView.ViewHolder {
+            TextView textView;
+
+            public ViewHolder(@NonNull View itemView) {
+                super(itemView);
+                textView = itemView.findViewById(android.R.id.text1);
+            }
+        }
     }
 
     private void eliminarManual(String nombreArchivo) {
         java.io.File carpeta = new java.io.File(getFilesDir(), "Manuales");
-        java.io.File archivo = new  java.io.File(carpeta, nombreArchivo);
+        java.io.File archivo = new java.io.File(carpeta, nombreArchivo);
 
         if (archivo.exists()) {
             if (archivo.delete()) {
                 Toast.makeText(this, "Archivo eliminado", Toast.LENGTH_SHORT).show();
-                adapter.remove(nombreArchivo);
-                adapter.notifyDataSetChanged();
+                cargarManualesLocales(); // Recargar la lista
             } else {
                 Toast.makeText(this, "No se pudo eliminar el archivo", Toast.LENGTH_SHORT).show();
             }
@@ -138,20 +171,27 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void cargarManualesLocales() {
-        java.io.File carpeta = new java.io.File(getFilesDir(), "Manuales");
-        if (!carpeta.exists()) return;
+        new Thread(() -> {
+            java.io.File carpeta = new java.io.File(getFilesDir(), "Manuales");
+            List<String> nombresLocales = new ArrayList<>();
 
-        java.io.File[] archivos = carpeta.listFiles();
-        if (archivos == null || archivos.length == 0) return;
+            if (carpeta.exists()) {
+                java.io.File[] archivos = carpeta.listFiles();
+                if (archivos != null) {
+                    for (java.io.File archivo : archivos) {
+                        nombresLocales.add(archivo.getName());
+                    }
+                }
+            }
 
-        List<String> nombresLocales = new ArrayList<>();
-        for (java.io.File archivo : archivos) {
-            nombresLocales.add(archivo.getName());
-        }
-
-        adapter.clear();
-        adapter.addAll(nombresLocales);
-        adapter.notifyDataSetChanged();
+            runOnUiThread(() -> {
+                nombres.clear();
+                nombres.addAll(nombresLocales);
+                if (adapter != null) {
+                    adapter.updateData(nombresLocales);
+                }
+            });
+        }).start();
     }
 
     private void iniciarAutenticacionGoogle() {
@@ -160,7 +200,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
         if (requestCode == RC_SIGN_IN) {
@@ -174,7 +214,7 @@ public class MainActivity extends AppCompatActivity {
             } catch (ApiException e) {
                 Toast.makeText(this, "Error al iniciar sesión", Toast.LENGTH_SHORT).show();
                 Log.e(TAG, "Error completo al iniciar sesión: " + e.toString());
-                e.printStackTrace(); // Fuerza la impresión en LogCat
+                e.printStackTrace();
             }
         }
     }
@@ -226,7 +266,7 @@ public class MainActivity extends AppCompatActivity {
                                     iterator.remove();
                                 }
                             }
-
+                            nuevoHistorial.add(nuevo);
                         }
                         nuevosNombres.add(file.getName());
                     }
@@ -234,18 +274,21 @@ public class MainActivity extends AppCompatActivity {
                     guardarHistorial(nuevoHistorial);
 
                     runOnUiThread(() -> {
-                        adapter.clear();
-                        adapter.addAll(nuevosNombres);
-                        adapter.notifyDataSetChanged();
-                        Toast.makeText(this, "Sincronización completa.", Toast.LENGTH_SHORT).show();
+                        nombres.clear();
+                        nombres.addAll(nuevosNombres);
+                        adapter.updateData(nuevosNombres);
+                        Toast.makeText(MainActivity.this, "Sincronización completa.", Toast.LENGTH_SHORT).show();
                     });
                 } else {
                     runOnUiThread(() ->
-                            Toast.makeText(this, "No hay archivos en la carpeta", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(MainActivity.this, "No hay archivos en la carpeta", Toast.LENGTH_SHORT).show()
                     );
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Error al listar archivos", e);
+                runOnUiThread(() ->
+                        Toast.makeText(MainActivity.this, "Error al conectar con Drive", Toast.LENGTH_SHORT).show()
+                );
             }
         }).start();
     }
@@ -281,7 +324,6 @@ public class MainActivity extends AppCompatActivity {
         return true;
     }
 
-
     private void descargarYGuardarArchivo(File archivoDrive) {
         new Thread(() -> {
             try {
@@ -302,16 +344,43 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "Archivo descargado y guardado en: " + archivoLocal.getAbsolutePath());
 
                 runOnUiThread(() ->
-                        Toast.makeText(this, "Archivo descargado: " + archivoDrive.getName(), Toast.LENGTH_SHORT).show()
+                        Toast.makeText(MainActivity.this, "Archivo descargado: " + archivoDrive.getName(), Toast.LENGTH_SHORT).show()
                 );
             } catch (Exception e) {
                 Log.e(TAG, "Error descargando archivo: " + archivoDrive.getName(), e);
                 runOnUiThread(() ->
-                        Toast.makeText(this, "Error descargando archivo: " + archivoDrive.getName(), Toast.LENGTH_SHORT).show()
+                        Toast.makeText(MainActivity.this, "Error descargando archivo: " + archivoDrive.getName(), Toast.LENGTH_SHORT).show()
                 );
             }
         }).start();
     }
 
+    // Clase interna para representar los archivos descargados en el historial
+    public static class ArchivoDescargado {
+        private String id;
+        private String name;
+        private String modifiedTime;
 
+        public ArchivoDescargado() {
+            // Constructor vacío necesario para Gson
+        }
+
+        public ArchivoDescargado(String id, String name, String modifiedTime) {
+            this.id = id;
+            this.name = name;
+            this.modifiedTime = modifiedTime;
+        }
+
+        public String getId() {
+            return id;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public String getModifiedTime() {
+            return modifiedTime;
+        }
+    }
 }

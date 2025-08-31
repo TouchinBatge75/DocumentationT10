@@ -12,29 +12,27 @@ import android.print.PrintManager;
 import android.util.DisplayMetrics;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 import android.widget.Button;
-import android.widget.ImageView;
-import androidx.appcompat.widget.SearchView;
+import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.SearchView;
 import androidx.appcompat.widget.Toolbar;
 
 import java.io.File;
 import java.io.IOException;
-
-import android.view.GestureDetector;
-import android.view.MotionEvent;
-import android.view.ScaleGestureDetector;
+import java.util.ArrayList;
+import java.util.List;
 
 import com.github.chrisbanes.photoview.PhotoView;
 
 public class VisorManualActivity extends AppCompatActivity {
 
     public static final String EXTRA_MANUAL_PATH = "manual_path";
-    private GestureDetector gestureDetector;
-    private ScaleGestureDetector scaleGestureDetector;
     private PhotoView pdfImageView;
 
     private Button btnPrev, btnNext;
@@ -42,7 +40,7 @@ public class VisorManualActivity extends AppCompatActivity {
 
     private String textoCompletoPdf;
     private PdfRenderer pdfRenderer;
-    private PdfRenderer.Page currentPage; // Cambiado el nombre para consistencia
+    private PdfRenderer.Page currentPage;
     private ParcelFileDescriptor parcelFileDescriptor;
 
     private int currentPageIndex = 0;
@@ -50,10 +48,17 @@ public class VisorManualActivity extends AppCompatActivity {
     private float scaleFactor = 1.0f;
     private final float SCALE_STEP = 0.2f;
 
-    // Variables corregidas - eliminadas las duplicadas
     private float minScale = 1.0f;
     private float maxScale = 3.0f;
     private String rutaArchivo;
+
+    // Variables para navegación de búsqueda
+    private LinearLayout searchNavigationLayout;
+    private TextView tvSearchIndicator;
+    private Button btnPrevResult, btnNextResult;
+    private List<Integer> searchResults = new ArrayList<>();
+    private int currentSearchIndex = -1;
+    private String currentSearchQuery = "";
 
     @SuppressLint("ClickableViewAccessibility")
     @Override
@@ -74,6 +79,27 @@ public class VisorManualActivity extends AppCompatActivity {
         initViews();
         cargarPDF();
 
+        EditText pageInput = findViewById(R.id.pageInput);
+        TextView pageTotal = findViewById(R.id.pageTotal);
+
+        pageInput.setText(String.valueOf(currentPageIndex + 1));
+        pageTotal.setText("/" + pageCount);
+
+
+        pageInput.setOnEditorActionListener((v, actionId, event) -> {
+            String input = pageInput.getText().toString();
+            if (!input.isEmpty()) {
+                int nuevaPagina = Integer.parseInt(input) - 1; // Convertir a índice 0-based
+                if (nuevaPagina >= 0 && nuevaPagina < pageCount) {
+                    mostrarPagina(nuevaPagina);
+                } else {
+                    Toast.makeText(this, "Página fuera de rango", Toast.LENGTH_SHORT).show();
+                    pageInput.setText(String.valueOf(currentPageIndex + 1)); // Restaurar página actual
+                }
+            }
+            return true;
+        });
+
         // Listener para detectar taps en tercios de la pantalla
         pdfImageView.setOnViewTapListener((view, x, y) -> {
             int width = view.getWidth();
@@ -90,10 +116,19 @@ public class VisorManualActivity extends AppCompatActivity {
         pdfImageView = findViewById(R.id.pdfImageView);
         btnPrev = findViewById(R.id.btnPrev);
         btnNext = findViewById(R.id.btnNext);
-        tvPageIndicator = findViewById(R.id.tvPageIndicator);
+
+        // Nuevos elementos para navegación de búsqueda
+        btnPrevResult = findViewById(R.id.btnPrevResult);
+        btnNextResult = findViewById(R.id.btnNextResult);
+        searchNavigationLayout = findViewById(R.id.searchNavigationLayout);
+        tvSearchIndicator = findViewById(R.id.tvSearchIndicator);
 
         btnPrev.setOnClickListener(v -> mostrarPaginaAnterior());
         btnNext.setOnClickListener(v -> mostrarPaginaSiguiente());
+
+        // Listeners para navegación de búsqueda
+        btnPrevResult.setOnClickListener(v -> navegarResultadoAnterior());
+        btnNextResult.setOnClickListener(v -> navegarResultadoSiguiente());
     }
 
     private void cargarPDF() {
@@ -166,23 +201,28 @@ public class VisorManualActivity extends AppCompatActivity {
                     Bitmap.Config.ARGB_8888
             );
 
-            // Renderizar la página en el bitmap
-            bitmap.eraseColor(Color.WHITE); // Fondo blanco
+            bitmap.eraseColor(Color.WHITE);
             currentPage.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
 
             pdfImageView.setImageBitmap(bitmap);
 
-            // Resetear zoom al cambiar de página
             pdfImageView.setScale(1.0f, false);
 
             currentPageIndex = index;
             actualizarIndicadorPagina();
+
+            //Actualizar input y total
+            EditText pageInput = findViewById(R.id.pageInput);
+            TextView pageTotal = findViewById(R.id.pageTotal);
+            pageInput.setText(String.valueOf(currentPageIndex + 1));
+            pageTotal.setText("/" + pageCount);
 
         } catch (Exception e) {
             e.printStackTrace();
             Toast.makeText(this, "Error al mostrar página", Toast.LENGTH_SHORT).show();
         }
     }
+
 
     private void actualizarIndicadorPagina() {
         if (tvPageIndicator != null) {
@@ -202,25 +242,78 @@ public class VisorManualActivity extends AppCompatActivity {
         }
     }
 
+    // Métodos para navegación de búsqueda
+    private void navegarResultadoAnterior() {
+        if (!searchResults.isEmpty() && currentSearchIndex > 0) {
+            currentSearchIndex--;
+            int pagina = searchResults.get(currentSearchIndex);
+            mostrarPagina(pagina);
+            actualizarIndicadorBusqueda();
+        }
+    }
+
+    private void navegarResultadoSiguiente() {
+        if (!searchResults.isEmpty() && currentSearchIndex < searchResults.size() - 1) {
+            currentSearchIndex++;
+            int pagina = searchResults.get(currentSearchIndex);
+            mostrarPagina(pagina);
+            actualizarIndicadorBusqueda();
+        }
+    }
+
+    private void actualizarIndicadorBusqueda() {
+        if (!searchResults.isEmpty()) {
+            String indicador = (currentSearchIndex + 1) + " / " + searchResults.size();
+            tvSearchIndicator.setText(indicador);
+        }
+    }
+
+    private void mostrarBotonesBusqueda(boolean mostrar) {
+        if (mostrar && !searchResults.isEmpty()) {
+            searchNavigationLayout.setVisibility(View.VISIBLE);
+            actualizarIndicadorBusqueda();
+        } else {
+            searchNavigationLayout.setVisibility(View.GONE);
+            // Limpiar resultados cuando se oculta
+            searchResults.clear();
+            currentSearchIndex = -1;
+        }
+    }
+
+
     private void buscarPalabraEnPdf(String palabraClave) {
         if (textoCompletoPdf != null && palabraClave != null && !palabraClave.isEmpty()) {
+            currentSearchQuery = palabraClave;
             new Thread(() -> {
                 try {
                     ExtractorPDF extractor = new ExtractorPDF(this);
-                    int pagina = extractor.buscarPaginaQueContiene(palabraClave, rutaArchivo);
+                    List<Integer> resultados = extractor.buscarTodasLasPaginas(palabraClave, rutaArchivo);
+
                     runOnUiThread(() -> {
-                        if (pagina >= 0) {
-                            Toast.makeText(this, "Palabra encontrada en página " + (pagina + 1), Toast.LENGTH_SHORT).show();
-                            mostrarPagina(pagina);
+                        if (resultados != null && !resultados.isEmpty()) {
+                            searchResults = resultados;
+                            currentSearchIndex = 0;
+
+                            Toast.makeText(this, "Encontradas " + resultados.size() + " coincidencias", Toast.LENGTH_SHORT).show();
+                            mostrarBotonesBusqueda(true);
+                            mostrarPagina(resultados.get(0));
+                            actualizarIndicadorBusqueda();
                         } else {
                             Toast.makeText(this, "No se encontró la palabra", Toast.LENGTH_SHORT).show();
+                            searchResults.clear();
+                            mostrarBotonesBusqueda(false);
                         }
                     });
                 } catch (IOException e) {
                     e.printStackTrace();
-                    runOnUiThread(() -> Toast.makeText(this, "Error al buscar palabra", Toast.LENGTH_SHORT).show());
+                    runOnUiThread(() -> {
+                        Toast.makeText(this, "Error al buscar palabra", Toast.LENGTH_SHORT).show();
+                        mostrarBotonesBusqueda(false);
+                    });
                 }
             }).start();
+        } else {
+            mostrarBotonesBusqueda(false);
         }
     }
 

@@ -24,10 +24,12 @@ public class SplashActivity extends Activity
 
         ImageView logo = findViewById(R.id.logo);//Busca la imagen para logo'
         TextView titulo = findViewById(R.id.tituloApp);//Busca el visor de texto con el titulo 'tituloApp'
-
+        TextView titulo2 = findViewById(R.id.tituloApp2);
+        TextView titulo3 = findViewById(R.id.tituloApp3);
         logo.startAnimation(fadeIn);//efecto de desvanecido en el logo
         titulo.startAnimation(fadeIn);//efecto de desvanecido en el texto
-
+        titulo2.startAnimation(fadeIn);
+        titulo3.startAnimation(fadeIn);
         //retraso de 2.5 sg para la splash Activity
         new Handler().postDelayed(()->
         {

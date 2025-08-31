@@ -8,6 +8,8 @@ import com.tom_roush.pdfbox.text.PDFTextStripper;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ExtractorPDF {
 
@@ -45,5 +47,26 @@ public class ExtractorPDF {
 
         document.close();
         return -1;
+    }
+
+    public List<Integer> buscarTodasLasPaginas(String palabraClave, String rutaArchivo) throws IOException {
+        List<Integer> paginasEncontradas = new ArrayList<>();
+        File file = new File(rutaArchivo);
+        PDDocument document = PDDocument.load(file);
+        PDFTextStripper stripper = new PDFTextStripper();
+
+        int totalPages = document.getNumberOfPages();
+        for (int i = 0; i < totalPages; i++) {
+            stripper.setStartPage(i + 1);
+            stripper.setEndPage(i + 1);
+            String textoPagina = stripper.getText(document);
+
+            if (textoPagina.toLowerCase().contains(palabraClave.toLowerCase())) {
+                paginasEncontradas.add(i); // Añadir índice de la página (0-based)
+            }
+        }
+
+        document.close();
+        return paginasEncontradas;
     }
 }

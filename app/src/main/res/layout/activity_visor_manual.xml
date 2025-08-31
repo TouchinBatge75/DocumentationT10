@@ -21,42 +21,106 @@
             app:title="Visor PDF"
             app:titleTextColor="@android:color/black"/>
 
-        <!-- Controles de navegación -->
+        <!-- Contenedor principal de navegación -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
+            android:orientation="vertical"
             android:padding="8dp"
-            android:background="#6AEBA4"
-            android:gravity="center_vertical">
+            android:background="#6AEBA4">
 
-            <Button
-                android:id="@+id/btnPrev"
-                android:layout_width="wrap_content"
+            <!-- Fila 1: Navegación principal de páginas -->
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Anterior"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:textColor="@android:color/black"
-                android:layout_marginHorizontal="8dp"/>
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
 
-            <TextView
-                android:id="@+id/tvPageIndicator"
-                android:layout_width="0dp"
+                <Button
+                    android:id="@+id/btnPrev"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Anterior"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:textColor="@android:color/black"
+                    android:layout_marginEnd="4dp"/>
+
+                <EditText
+                    android:id="@+id/pageInput"
+                    android:layout_width="50dp"
+                    android:layout_height="wrap_content"
+                    android:inputType="number"
+                    android:hint="1"
+                    android:gravity="center"
+                    android:maxLines="1"/>
+
+                <TextView
+                    android:id="@+id/pageTotal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="/0"
+                    android:padding="4dp"/>
+
+                <Button
+                    android:id="@+id/btnNext"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Siguiente"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:textColor="@android:color/black"
+                    android:layout_marginStart="4dp"/>
+            </LinearLayout>
+
+            <!-- Fila 2: Navegación de resultados de búsqueda (oculta inicialmente) -->
+            <LinearLayout
+                android:id="@+id/searchNavigationLayout"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Página 1/1"
-                android:textColor="@android:color/black"
+                android:orientation="horizontal"
                 android:gravity="center"
-                android:textAppearance="@style/TextAppearance.MaterialComponents.Caption"/>
+                android:visibility="gone"
+                android:background="#80FFFFFF"
+                android:padding="4dp">
 
-            <Button
-                android:id="@+id/btnNext"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Siguiente"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:textColor="@android:color/black"
-                android:layout_marginHorizontal="8dp"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Resultados: "
+                    android:textColor="@android:color/black"
+                    android:textStyle="bold"
+                    android:layout_marginEnd="8dp"/>
+
+                <Button
+                    android:id="@+id/btnPrevResult"
+                    android:layout_width="45dp"
+                    android:layout_height="40dp"
+                    android:text="Anterior"
+                    android:textSize="12sp"
+                    android:backgroundTint="#7AAB68"
+                    android:textColor="@android:color/black"
+                    android:layout_marginEnd="4dp"/>
+
+                <TextView
+                    android:id="@+id/tvSearchIndicator"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0/0"
+                    android:textColor="@android:color/black"
+                    android:layout_marginHorizontal="8dp"/>
+
+                <Button
+                    android:id="@+id/btnNextResult"
+                    android:layout_width="45dp"
+                    android:layout_height="40dp"
+                    android:text="Siguiente"
+                    android:textSize="12sp"
+                    android:backgroundTint="#7AAB68"
+                    android:textColor="@android:color/black"
+                    android:layout_marginStart="4dp"/>
+            </LinearLayout>
         </LinearLayout>
     </com.google.android.material.appbar.AppBarLayout>
 

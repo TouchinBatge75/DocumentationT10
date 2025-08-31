@@ -1,26 +1,43 @@
-<?xml version="1.0" encoding="utf-8"?>
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="vertical"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="26dp">
+    android:padding="16dp">
 
-    <Button
-        android:id="@+id/btn_descargar_manuales"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Descargar manuales"
-        android:backgroundTint="#6AEBA4"
-        android:layout_marginTop="16dp"
-        android:textColor="@android:color/black"
-        android:layout_gravity="center" />
-
-    <ListView
-        android:id="@+id/lista_manuales"
+    <!-- Barra de acciones -->
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"/>
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingBottom="8dp">
 
+        <Button
+            android:id="@+id/btn_descargar_manuales"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:text="Descargar todos"
+            android:backgroundTint="#6AEBA4"
+            android:textColor="@android:color/black"
+            android:layout_height="50dp"/>
 
+        <Button
+            android:id="@+id/btn_search_manual"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:text="Buscar manual"
+            android:backgroundTint="#6AEBA4"
+            android:textColor="@android:color/black"
+            android:layout_marginStart="8dp"
+            android:layout_height="50dp"/>
+    </LinearLayout>
 
+    <!-- Lista de manuales -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rv_manuales"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:paddingTop="8dp"/>
 </LinearLayout>
