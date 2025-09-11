@@ -1,6 +1,5 @@
 package com.example.documentation;
 
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
@@ -8,6 +7,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.ProgressBar;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -23,7 +24,6 @@ import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.tasks.Task;
-
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
@@ -34,21 +34,19 @@ import com.google.api.services.drive.DriveScopes;
 import com.google.api.services.drive.model.File;
 import com.google.api.services.drive.model.FileList;
 import com.google.common.reflect.TypeToken;
+import com.google.gson.Gson;
 
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-
-import com.google.gson.Gson;
-
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Stack;
 
-//Cuenta donde se guardan los manuales: manuales615@gmail.com - M@nuales975
 public class MainActivity extends AppCompatActivity {
 
     private static final int RC_SIGN_IN = 1000;
@@ -57,23 +55,47 @@ public class MainActivity extends AppCompatActivity {
     private Drive mDriveService;
     private RecyclerView recyclerView;
     private ManualAdapter adapter;
-    private List<String> nombres = new ArrayList<>();
+    private List<ItemDrive> items = new ArrayList<>();
+    private GoogleSignInAccount currentAccount;
+    private String folderID = "11a5MPz8K1vFk7HhblB3DGW21CTRZn-uW";
+    private String currentRelativePath = "";
+
+    private Stack<String> pilaCarpetas = new Stack<>();
+    private Stack<String> pilaRutas = new Stack<>();
+
+    // Clase interna
+    public static class ItemDrive {
+        public String id;
+        public String name;
+        public boolean esCarpeta;
+        public boolean descargado;
+        public String rutaRelativa;
+
+        public ItemDrive(String id, String name, boolean esCarpeta, String rutaRelativa) {
+            this.id = id;
+            this.name = name;
+            this.esCarpeta = esCarpeta;
+            this.descargado = false;
+            this.rutaRelativa = rutaRelativa;
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Inicializar RecyclerView
+        pilaCarpetas.push(folderID);
+        pilaRutas.push("");
+
         recyclerView = findViewById(R.id.rv_manuales);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
 
-        adapter = new ManualAdapter(nombres);
+        adapter = new ManualAdapter(items);
         recyclerView.setAdapter(adapter);
 
-        cargarManualesLocales();
+        cargarManualesLocales(""); // Cargar desde la raíz
 
-        // Configurar opciones de Google Sign-In
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                 .requestEmail()
                 .requestScopes(new com.google.android.gms.common.api.Scope(DriveScopes.DRIVE_READONLY))
@@ -81,118 +103,326 @@ public class MainActivity extends AppCompatActivity {
 
         mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
 
-        // Asignar acción al botón de descargar
         Button btnDescargar = findViewById(R.id.btn_descargar_manuales);
         btnDescargar.setOnClickListener(view -> iniciarAutenticacionGoogle());
 
-        // Asignar acción al botón de búsqueda (puedes implementar la funcionalidad)
         Button btnBuscar = findViewById(R.id.btn_search_manual);
         btnBuscar.setOnClickListener(view -> {
             Toast.makeText(this, "Funcionalidad de búsqueda por implementar", Toast.LENGTH_SHORT).show();
         });
+
     }
 
-    // Adaptador para RecyclerView
-    private class ManualAdapter extends RecyclerView.Adapter<ManualAdapter.ViewHolder> {
-        private List<String> manuales;
 
-        public ManualAdapter(List<String> manuales) {
-            this.manuales = manuales;
+    @Override
+    public void onBackPressed() {
+        if (pilaCarpetas.size() > 1) {
+            // Remover la carpeta actual (la estamos saliendo)
+            pilaCarpetas.pop();
+            pilaRutas.pop();
+
+            // Recuperar la carpeta anterior
+            String carpetaAnterior = pilaCarpetas.peek();
+            String rutaAnterior = pilaRutas.peek();
+
+            // Actualizar variables actuales
+            this.folderID = carpetaAnterior;
+            this.currentRelativePath = rutaAnterior;
+
+            // SOLO cargar archivos locales al navegar atrás
+            cargarManualesLocales(rutaAnterior);
+
+            // Y solo si estamos autenticados, también cargar de Drive
+            if (currentAccount != null && mDriveService != null) {
+                listarCarpetaDrive(folderID, rutaAnterior);
+            }
+        } else {
+            super.onBackPressed();
+        }
+    }
+    private class ManualAdapter extends RecyclerView.Adapter<ManualAdapter.ViewHolder> {
+        private List<ItemDrive> items;
+
+        public ManualAdapter(List<ItemDrive> items) {
+            this.items = items;
         }
 
         @NonNull
         @Override
         public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             View view = LayoutInflater.from(parent.getContext())
-                    .inflate(android.R.layout.simple_list_item_1, parent, false);
+                    .inflate(R.layout.item_manual, parent, false);
             return new ViewHolder(view);
         }
 
+
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-            String nombreManual = manuales.get(position);
-            holder.textView.setText(nombreManual);
-
-            holder.itemView.setOnClickListener(v -> {
-                java.io.File archivoManual = new java.io.File(getFilesDir(), "Manuales/" + nombreManual);
-                if (archivoManual.exists()) {
-                    Intent intent = new Intent(MainActivity.this, VisorManualActivity.class);
-                    intent.putExtra(VisorManualActivity.EXTRA_MANUAL_PATH, archivoManual.getAbsolutePath());
-                    startActivity(intent);
-                } else {
-                    Toast.makeText(MainActivity.this, "Archivo no encontrado: " + nombreManual, Toast.LENGTH_SHORT).show();
-                }
-            });
+            ItemDrive item = items.get(position);
+            holder.nombre.setText(item.name);
 
             holder.itemView.setOnLongClickListener(v -> {
-                new AlertDialog.Builder(MainActivity.this)
-                        .setTitle("Eliminar manual")
-                        .setMessage("¿Deseas eliminar \"" + nombreManual + "\"?")
-                        .setPositiveButton("Eliminar", (dialog, which) -> eliminarManual(nombreManual))
-                        .setNegativeButton("Cancelar", null)
-                        .show();
-                return true;
+                if (!item.esCarpeta && item.descargado) {
+                    mostrarDialogoConfirmacionEliminacion(item, holder);
+                    return true;
+                }
+                return false;
             });
+
+            // Configurar el botón según el estado del item
+            actualizarBoton(holder, item, position);
+        }
+
+        private void actualizarBoton(ViewHolder holder, ItemDrive item, int position) {
+            // Asegurar que el botón sea visible y la ProgressBar oculta por defecto
+            holder.btnAccion.setVisibility(View.VISIBLE);
+            holder.progressCircular.setVisibility(View.GONE);
+            holder.btnAccion.setEnabled(true);
+
+            if (item.esCarpeta) {
+                holder.btnAccion.setText("Abrir carpeta");
+                holder.btnAccion.setOnClickListener(v -> {
+                    String nuevaRuta = item.rutaRelativa.isEmpty() ? item.name : item.rutaRelativa + "/" + item.name;
+                    MainActivity.this.abrirCarpeta(item.id, nuevaRuta);
+                });
+            } else {
+                if (item.descargado) {
+                    holder.btnAccion.setText("Abrir");
+                    holder.btnAccion.setOnClickListener(v -> abrirArchivo(item));
+                } else {
+                    holder.btnAccion.setText("Descargar");
+                    holder.btnAccion.setOnClickListener(v -> descargarArchivo(item, holder, position));
+                }
+            }
+        }
+
+        public void descargarArchivo(ItemDrive item, ViewHolder holder, int position) {
+            // Ocultar botón y mostrar ProgressBar
+            holder.btnAccion.setVisibility(View.GONE);
+            holder.progressCircular.setVisibility(View.VISIBLE);
+
+            new Thread(() -> {
+                try {
+                    // Crear la estructura de carpetas si es necesario
+                    java.io.File carpetaDestino = new java.io.File(getFilesDir(),
+                            "Manuales/" + (item.rutaRelativa.isEmpty() ? "" : item.rutaRelativa));
+                    if (!carpetaDestino.exists()) {
+                        carpetaDestino.mkdirs();
+                    }
+
+                    java.io.File archivoLocal = new java.io.File(carpetaDestino, item.name + ".pdf");
+
+                    FileOutputStream output = new FileOutputStream(archivoLocal);
+
+                    // Usar mDriveService de MainActivity
+                    MainActivity.this.mDriveService.files().get(item.id).executeMediaAndDownloadTo(output);
+                    output.close();
+
+                    // Descarga completada
+                    item.descargado = true;
+
+                    runOnUiThread(() -> {
+                        // Ocultar ProgressBar y mostrar botón
+                        holder.progressCircular.setVisibility(View.GONE);
+                        holder.btnAccion.setVisibility(View.VISIBLE);
+
+                        // Actualizar el botón a "Abrir"
+                        holder.btnAccion.setText("Abrir");
+                        holder.btnAccion.setEnabled(true);
+
+                        // Configurar el listener para abrir el archivo
+                        holder.btnAccion.setOnClickListener(v -> abrirArchivo(item));
+
+                        Toast.makeText(MainActivity.this, "Descargado: " + item.name, Toast.LENGTH_SHORT).show();
+                    });
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    runOnUiThread(() -> {
+                        // Ocultar ProgressBar y mostrar botón
+                        holder.progressCircular.setVisibility(View.GONE);
+                        holder.btnAccion.setVisibility(View.VISIBLE);
+
+                        // Si hay error, volver a "Descargar"
+                        holder.btnAccion.setText("Descargar");
+                        holder.btnAccion.setEnabled(true);
+
+                        // Restaurar el listener de descarga
+                        holder.btnAccion.setOnClickListener(v -> descargarArchivo(item, holder, position));
+
+                        Toast.makeText(MainActivity.this, "Error al descargar " + item.name, Toast.LENGTH_SHORT).show();
+                    });
+                }
+            }).start();
+        }
+
+        public void eliminarArchivo(ItemDrive item, ViewHolder holder, int position) {
+            java.io.File archivoLocal = new java.io.File(getFilesDir(),
+                    "Manuales/" + (item.rutaRelativa.isEmpty() ? "" : item.rutaRelativa + "/") + item.name + ".pdf");
+
+            if (archivoLocal.exists() && archivoLocal.delete()) {
+                item.descargado = false;
+
+                // Asegurar que se vea el botón y no la ProgressBar
+                holder.btnAccion.setVisibility(View.VISIBLE);
+                holder.progressCircular.setVisibility(View.GONE);
+
+                // Actualizar el botón inmediatamente
+                holder.btnAccion.setText("Descargar");
+                holder.btnAccion.setEnabled(true);
+                holder.btnAccion.setOnClickListener(v -> descargarArchivo(item, holder, position));
+
+                Toast.makeText(MainActivity.this, "Archivo eliminado: " + item.name, Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(MainActivity.this, "Error al eliminar el archivo", Toast.LENGTH_SHORT).show();
+            }
+        }
+
+        private void abrirArchivo(ItemDrive item) {
+            java.io.File archivoLocal = new java.io.File(getFilesDir(),
+                    "Manuales/" + (item.rutaRelativa.isEmpty() ? "" : item.rutaRelativa + "/") + item.name + ".pdf");
+            if (archivoLocal.exists()) {
+                Intent intent = new Intent(MainActivity.this, VisorManualActivity.class);
+                intent.putExtra(VisorManualActivity.EXTRA_MANUAL_PATH, archivoLocal.getAbsolutePath());
+                startActivity(intent);
+            } else {
+                // Si el archivo no existe, actualizar el estado
+                item.descargado = false;
+                notifyItemChanged(items.indexOf(item));
+                Toast.makeText(MainActivity.this, "Archivo no encontrado", Toast.LENGTH_SHORT).show();
+            }
         }
 
         @Override
         public int getItemCount() {
-            return manuales.size();
+            return items.size();
         }
 
-        public void updateData(List<String> nuevosManuales) {
-            manuales.clear();
-            manuales.addAll(nuevosManuales);
+        public void updateData(List<ItemDrive> nuevosItems) {
+            items.clear();
+            items.addAll(nuevosItems);
             notifyDataSetChanged();
         }
 
         public class ViewHolder extends RecyclerView.ViewHolder {
-            TextView textView;
+            TextView nombre;
+            Button btnAccion;
+            ProgressBar progressCircular;
+            RelativeLayout progressContainer;
 
             public ViewHolder(@NonNull View itemView) {
                 super(itemView);
-                textView = itemView.findViewById(android.R.id.text1);
+                nombre = itemView.findViewById(R.id.nombre_manual);
+                btnAccion = itemView.findViewById(R.id.btnAccion);
+                progressCircular = itemView.findViewById(R.id.progress_circular);
+                progressContainer = itemView.findViewById(R.id.progress_container);
             }
         }
+    }private void mostrarDialogoConfirmacionEliminacion(ItemDrive item, ManualAdapter.ViewHolder holder) {
+        int position = holder.getAdapterPosition();
+        if (position == RecyclerView.NO_POSITION) return;
+
+        new AlertDialog.Builder(this)
+                .setTitle("Confirmar eliminación")
+                .setMessage("¿Estás seguro de que quieres eliminar el archivo \"" + item.name + "\"?")
+                .setPositiveButton("Sí", (dialog, which) -> {
+                    adapter.eliminarArchivo(item, holder, position);
+                })
+                .setNegativeButton("No", (dialog, which) -> dialog.dismiss())
+                .setIcon(android.R.drawable.ic_dialog_alert)
+                .show();
     }
 
-    private void eliminarManual(String nombreArchivo) {
-        java.io.File carpeta = new java.io.File(getFilesDir(), "Manuales");
-        java.io.File archivo = new java.io.File(carpeta, nombreArchivo);
 
-        if (archivo.exists()) {
-            if (archivo.delete()) {
-                Toast.makeText(this, "Archivo eliminado", Toast.LENGTH_SHORT).show();
-                cargarManualesLocales(); // Recargar la lista
-            } else {
-                Toast.makeText(this, "No se pudo eliminar el archivo", Toast.LENGTH_SHORT).show();
-            }
-        }
-    }
-
-    private void cargarManualesLocales() {
+    private void cargarManualesLocales(String rutaRelativa) {
         new Thread(() -> {
-            java.io.File carpeta = new java.io.File(getFilesDir(), "Manuales");
-            List<String> nombresLocales = new ArrayList<>();
+            java.io.File carpeta = new java.io.File(getFilesDir(), "Manuales/" + rutaRelativa);
+            List<ItemDrive> itemsLocales = new ArrayList<>();
 
             if (carpeta.exists()) {
-                java.io.File[] archivos = carpeta.listFiles();
-                if (archivos != null) {
-                    for (java.io.File archivo : archivos) {
-                        nombresLocales.add(archivo.getName());
-                    }
-                }
+                recorrerCarpeta(carpeta, rutaRelativa, itemsLocales);
             }
 
             runOnUiThread(() -> {
-                nombres.clear();
-                nombres.addAll(nombresLocales);
-                if (adapter != null) {
-                    adapter.updateData(nombresLocales);
-                }
+                items.clear();
+                items.addAll(itemsLocales);
+                adapter.updateData(itemsLocales);
+                currentRelativePath = rutaRelativa; // Actualizar la ruta actual
             });
         }).start();
     }
+
+    private void recorrerCarpeta(java.io.File carpetaActual, String rutaRelativa, List<ItemDrive> lista) {
+        java.io.File[] archivos = carpetaActual.listFiles();
+        if (archivos != null) {
+            for (java.io.File archivo : archivos) {
+                if (archivo.isFile() && archivo.getName().endsWith(".pdf")) {
+                    String nombreArchivo = archivo.getName().substring(0, archivo.getName().length() - 4);
+                    ItemDrive item = new ItemDrive("", nombreArchivo, false, rutaRelativa);
+                    item.descargado = true;
+                    lista.add(item);
+                } else if (archivo.isDirectory()) {
+                    // Para carpetas locales, mostrarlas también
+                    ItemDrive item = new ItemDrive("", archivo.getName(), true, rutaRelativa);
+                    lista.add(item);
+                }
+            }
+        }
+    }
+
+    private void listarCarpetaDrive(String folderId, String rutaRelativa) {
+        // Verificar que el servicio de Drive esté inicializado
+        if (mDriveService == null) {
+            Log.d(TAG, "Servicio de Drive no inicializado");
+            return;
+        }
+
+        new Thread(() -> {
+            try {
+                FileList result = mDriveService.files().list()
+                        .setQ("'" + folderId + "' in parents and trashed=false")
+                        .setFields("files(id, name, mimeType, parents)")
+                        .execute();
+
+                List<ItemDrive> itemsDrive = new ArrayList<>();
+                if (result.getFiles() != null) {
+                    for (File f : result.getFiles()) {
+                        boolean esCarpeta = "application/vnd.google-apps.folder".equals(f.getMimeType());
+
+                        boolean descargado = false;
+                        String nombreArchivo = f.getName();
+
+                        if (!esCarpeta) {
+                            // Asegurar extensión .pdf
+                            if (!nombreArchivo.toLowerCase().endsWith(".pdf")) {
+                                nombreArchivo += ".pdf";
+                            }
+
+                            java.io.File archivoLocal = new java.io.File(getFilesDir(),
+                                    "Manuales/" + (rutaRelativa.isEmpty() ? "" : rutaRelativa + "/") + nombreArchivo);
+                            descargado = archivoLocal.exists();
+                        }
+
+                        // Para mostrar en UI quitamos .pdf solo si es archivo
+                        String nombreMostrar = esCarpeta ? nombreArchivo : nombreArchivo.replace(".pdf", "");
+
+                        ItemDrive item = new ItemDrive(f.getId(), nombreMostrar, esCarpeta, rutaRelativa);
+                        item.descargado = descargado;
+                        itemsDrive.add(item);
+                    }
+                }
+
+                runOnUiThread(() -> {
+                    adapter.updateData(itemsDrive);
+                    currentRelativePath = rutaRelativa; // Actualizar la ruta actual
+                });
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error al listar carpeta de Drive: " + e.getMessage());
+                // Evitamos Toast molesto, solo log
+            }
+        }).start();
+    }
+
 
     private void iniciarAutenticacionGoogle() {
         Intent signInIntent = mGoogleSignInClient.getSignInIntent();
@@ -213,13 +443,14 @@ public class MainActivity extends AppCompatActivity {
                 }
             } catch (ApiException e) {
                 Toast.makeText(this, "Error al iniciar sesión", Toast.LENGTH_SHORT).show();
-                Log.e(TAG, "Error completo al iniciar sesión: " + e.toString());
-                e.printStackTrace();
+                Log.e(TAG, "Error al iniciar sesión: " + e.toString());
             }
         }
     }
 
     private void obtenerManualesDesdeDrive(GoogleSignInAccount account) {
+        this.currentAccount = account;
+
         HttpTransport transport = new NetHttpTransport();
         JsonFactory jsonFactory = GsonFactory.getDefaultInstance();
 
@@ -233,136 +464,34 @@ public class MainActivity extends AppCompatActivity {
 
         Log.d(TAG, "Servicio de Drive inicializado correctamente.");
 
-        // ID puro de la carpeta (sin "?usp=sharing")
-        String folderId = "11a5MPz8K1vFk7HhblB3DGW21CTRZn-uW";
-
-        new Thread(() -> {
-            try {
-                FileList result = mDriveService.files().list()
-                        .setQ("'" + folderId + "' in parents and trashed = false")
-                        .setFields("files(id, name, mimeType, modifiedTime)")
-                        .execute();
-
-                List<File> files = result.getFiles();
-                List<ArchivoDescargado> historial = cargarHistorial();
-                List<ArchivoDescargado> nuevoHistorial = new ArrayList<>(historial);
-                List<String> nuevosNombres = new ArrayList<>();
-
-                if (files != null && !files.isEmpty()) {
-                    for (File file : files) {
-                        if (esNuevoOEditado(file, historial)) {
-                            descargarYGuardarArchivo(file);
-
-                            ArchivoDescargado nuevo = new ArchivoDescargado(
-                                    file.getId(),
-                                    file.getName(),
-                                    file.getModifiedTime().toStringRfc3339()
-                            );
-
-                            // Actualizar historial
-                            for (Iterator<ArchivoDescargado> iterator = nuevoHistorial.iterator(); iterator.hasNext();) {
-                                ArchivoDescargado a = iterator.next();
-                                if (a.getId().equals(nuevo.getId())) {
-                                    iterator.remove();
-                                }
-                            }
-                            nuevoHistorial.add(nuevo);
-                        }
-                        nuevosNombres.add(file.getName());
-                    }
-
-                    guardarHistorial(nuevoHistorial);
-
-                    runOnUiThread(() -> {
-                        nombres.clear();
-                        nombres.addAll(nuevosNombres);
-                        adapter.updateData(nuevosNombres);
-                        Toast.makeText(MainActivity.this, "Sincronización completa.", Toast.LENGTH_SHORT).show();
-                    });
-                } else {
-                    runOnUiThread(() ->
-                            Toast.makeText(MainActivity.this, "No hay archivos en la carpeta", Toast.LENGTH_SHORT).show()
-                    );
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error al listar archivos", e);
-                runOnUiThread(() ->
-                        Toast.makeText(MainActivity.this, "Error al conectar con Drive", Toast.LENGTH_SHORT).show()
-                );
-            }
-        }).start();
+        listarCarpetaDrive(folderID, "");
     }
 
-    private List<ArchivoDescargado> cargarHistorial() {
-        java.io.File file = new java.io.File(getFilesDir(), "historial.json");
-        if (!file.exists()) return new ArrayList<>();
+    public void abrirCarpeta(String nuevaCarpetaID, String nuevaRutaRelativa) {
 
-        try (FileReader reader = new FileReader(file)) {
-            Gson gson = new Gson();
-            Type listType = new TypeToken<List<ArchivoDescargado>>() {}.getType();
-            return gson.fromJson(reader, listType);
-        } catch (IOException e) {
-            e.printStackTrace();
-            return new ArrayList<>();
+        if (!folderID.equals(nuevaCarpetaID) || !currentRelativePath.equals(nuevaRutaRelativa)) {
+            pilaCarpetas.push(folderID);
+            pilaRutas.push(currentRelativePath);
+        }
+
+        // Actualizar a la nueva carpeta
+        this.folderID = nuevaCarpetaID;
+        this.currentRelativePath = nuevaRutaRelativa;
+
+        // Cargar contenido
+        cargarManualesLocales(nuevaRutaRelativa);
+
+        if (currentAccount != null && mDriveService != null) {
+            listarCarpetaDrive(folderID, nuevaRutaRelativa);
         }
     }
 
-    private void guardarHistorial(List<ArchivoDescargado> archivos) {
-        try (FileWriter writer = new FileWriter(new java.io.File(getFilesDir(), "historial.json"))) {
-            new Gson().toJson(archivos, writer);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private boolean esNuevoOEditado(File fileDrive, List<ArchivoDescargado> historial) {
-        for (ArchivoDescargado local : historial) {
-            if (fileDrive.getId().equals(local.getId())) {
-                return !fileDrive.getModifiedTime().toStringRfc3339().equals(local.getModifiedTime());
-            }
-        }
-        return true;
-    }
-
-    private void descargarYGuardarArchivo(File archivoDrive) {
-        new Thread(() -> {
-            try {
-                // Crear carpeta "Manuales" dentro del almacenamiento privado de la app
-                java.io.File folder = new java.io.File(getFilesDir(), "Manuales");
-                if (!folder.exists()) {
-                    folder.mkdirs();
-                }
-
-                // Archivo local con el mismo nombre que el archivo de Drive
-                java.io.File archivoLocal = new java.io.File(folder, archivoDrive.getName());
-
-                // Descargar el archivo y guardar en archivoLocal
-                FileOutputStream outputStream = new FileOutputStream(archivoLocal);
-                mDriveService.files().get(archivoDrive.getId()).executeMediaAndDownloadTo(outputStream);
-                outputStream.close();
-
-                Log.d(TAG, "Archivo descargado y guardado en: " + archivoLocal.getAbsolutePath());
-
-                runOnUiThread(() ->
-                        Toast.makeText(MainActivity.this, "Archivo descargado: " + archivoDrive.getName(), Toast.LENGTH_SHORT).show()
-                );
-            } catch (Exception e) {
-                Log.e(TAG, "Error descargando archivo: " + archivoDrive.getName(), e);
-                runOnUiThread(() ->
-                        Toast.makeText(MainActivity.this, "Error descargando archivo: " + archivoDrive.getName(), Toast.LENGTH_SHORT).show()
-                );
-            }
-        }).start();
-    }
-
-    // Clase interna para representar los archivos descargados en el historial
     public static class ArchivoDescargado {
         private String id;
         private String name;
         private String modifiedTime;
 
         public ArchivoDescargado() {
-            // Constructor vacío necesario para Gson
         }
 
         public ArchivoDescargado(String id, String name, String modifiedTime) {

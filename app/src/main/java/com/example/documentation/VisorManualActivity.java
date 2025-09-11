@@ -180,6 +180,8 @@ public class VisorManualActivity extends AppCompatActivity {
         }
     }
 
+
+
     private void abrirRenderer(File file) throws IOException {
         parcelFileDescriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY);
         pdfRenderer = new PdfRenderer(parcelFileDescriptor);
