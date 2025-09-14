@@ -200,7 +200,9 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
             ItemDrive item = items.get(position);
-            holder.nombre.setText(item.name);
+            holder.nombre.setText(item.esCarpeta
+                    ? item.name
+                    : item.name.replace(".pdf", ""));
 
             holder.itemView.setOnLongClickListener(v -> {
                 if (item.esCarpeta) {
