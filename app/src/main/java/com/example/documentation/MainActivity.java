@@ -91,7 +91,7 @@ public class MainActivity extends AppCompatActivity {
         recyclerView = findViewById(R.id.rv_manuales);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
 
-        adapter = new ManualAdapter(items);
+        adapter = new ManualAdapter(items, mDriveService);
         recyclerView.setAdapter(adapter);
 
         cargarManualesLocales(""); // Cargar desde la raíz
@@ -140,11 +140,48 @@ public class MainActivity extends AppCompatActivity {
             super.onBackPressed();
         }
     }
+
+
+
+    private void eliminarCarpeta(ItemDrive item) {
+        java.io.File carpetaLocal = new java.io.File(getFilesDir(),
+                "Manuales/" + (item.rutaRelativa.isEmpty() ? "" : item.rutaRelativa + "/") + item.name);
+
+        if (carpetaLocal.exists() && carpetaLocal.isDirectory()) {
+            boolean eliminada = eliminarRecursivamente(carpetaLocal);
+
+            if (eliminada) {
+                Toast.makeText(this, "Carpeta eliminada: " + item.name, Toast.LENGTH_SHORT).show();
+                // Recargar la vista actual
+                cargarManualesLocales(currentRelativePath);
+                if (currentAccount != null) {
+                    listarCarpetaDrive(folderID, currentRelativePath);
+                }
+            } else {
+                Toast.makeText(this, "No se pudo eliminar la carpeta", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    // Helper para borrar carpetas recursivamente
+    private boolean eliminarRecursivamente(java.io.File archivo) {
+        if (archivo.isDirectory()) {
+            java.io.File[] hijos = archivo.listFiles();
+            if (hijos != null) {
+                for (java.io.File hijo : hijos) {
+                    eliminarRecursivamente(hijo);
+                }
+            }
+        }
+        return archivo.delete();
+    }
     private class ManualAdapter extends RecyclerView.Adapter<ManualAdapter.ViewHolder> {
         private List<ItemDrive> items;
+        private Drive driveService; // Agregar esta variable
 
-        public ManualAdapter(List<ItemDrive> items) {
+        public ManualAdapter(List<ItemDrive> items, Drive driveService) {
             this.items = items;
+            this.driveService = driveService;
         }
 
         @NonNull
@@ -155,6 +192,10 @@ public class MainActivity extends AppCompatActivity {
             return new ViewHolder(view);
         }
 
+        public void setDriveService(Drive driveService) {
+            this.driveService = driveService;
+        }
+
 
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
@@ -162,7 +203,10 @@ public class MainActivity extends AppCompatActivity {
             holder.nombre.setText(item.name);
 
             holder.itemView.setOnLongClickListener(v -> {
-                if (!item.esCarpeta && item.descargado) {
+                if (item.esCarpeta) {
+                    MainActivity.this.mostrarDialogoConfirmacionEliminacionCarpeta(item);
+                    return true;
+                } else if (item.descargado) {
                     mostrarDialogoConfirmacionEliminacion(item, holder);
                     return true;
                 }
@@ -197,6 +241,12 @@ public class MainActivity extends AppCompatActivity {
         }
 
         public void descargarArchivo(ItemDrive item, ViewHolder holder, int position) {
+            // Verificar que el servicio de Drive esté disponible
+            if (driveService == null) {
+                Toast.makeText(MainActivity.this, "Error: Servicio de Drive no disponible", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
             // Ocultar botón y mostrar ProgressBar
             holder.btnAccion.setVisibility(View.GONE);
             holder.progressCircular.setVisibility(View.VISIBLE);
@@ -214,8 +264,8 @@ public class MainActivity extends AppCompatActivity {
 
                     FileOutputStream output = new FileOutputStream(archivoLocal);
 
-                    // Usar mDriveService de MainActivity
-                    MainActivity.this.mDriveService.files().get(item.id).executeMediaAndDownloadTo(output);
+                    // USAR driveService DEL ADAPTER (no MainActivity.this.mDriveService)
+                    driveService.files().get(item.id).executeMediaAndDownloadTo(output);
                     output.close();
 
                     // Descarga completada
@@ -249,13 +299,15 @@ public class MainActivity extends AppCompatActivity {
                         // Restaurar el listener de descarga
                         holder.btnAccion.setOnClickListener(v -> descargarArchivo(item, holder, position));
 
-                        Toast.makeText(MainActivity.this, "Error al descargar " + item.name, Toast.LENGTH_SHORT).show();
+                        Toast.makeText(MainActivity.this, "Error al descargar " + item.name + ": " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        Log.e(TAG, "Error al descargar", e);
                     });
                 }
             }).start();
         }
 
-        public void eliminarArchivo(ItemDrive item, ViewHolder holder, int position) {
+
+        public void eliminarArchivo(ItemDrive item, ManualAdapter.ViewHolder holder, int position) {
             java.io.File archivoLocal = new java.io.File(getFilesDir(),
                     "Manuales/" + (item.rutaRelativa.isEmpty() ? "" : item.rutaRelativa + "/") + item.name + ".pdf");
 
@@ -326,6 +378,18 @@ public class MainActivity extends AppCompatActivity {
                 .setMessage("¿Estás seguro de que quieres eliminar el archivo \"" + item.name + "\"?")
                 .setPositiveButton("Sí", (dialog, which) -> {
                     adapter.eliminarArchivo(item, holder, position);
+                })
+                .setNegativeButton("No", (dialog, which) -> dialog.dismiss())
+                .setIcon(android.R.drawable.ic_dialog_alert)
+                .show();
+    }
+
+    private void mostrarDialogoConfirmacionEliminacionCarpeta(ItemDrive item) {
+        new AlertDialog.Builder(this)
+                .setTitle("Eliminar carpeta")
+                .setMessage("¿Seguro que quieres eliminar la carpeta \"" + item.name + "\" y todo su contenido?")
+                .setPositiveButton("Sí", (dialog, which) -> {
+                    eliminarCarpeta(item);
                 })
                 .setNegativeButton("No", (dialog, which) -> dialog.dismiss())
                 .setIcon(android.R.drawable.ic_dialog_alert)
@@ -463,6 +527,9 @@ public class MainActivity extends AppCompatActivity {
                 .build();
 
         Log.d(TAG, "Servicio de Drive inicializado correctamente.");
+
+        // Actualizar el adapter con el servicio
+        adapter.setDriveService(mDriveService);
 
         listarCarpetaDrive(folderID, "");
     }
