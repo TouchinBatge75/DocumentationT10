@@ -6,9 +6,12 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -43,9 +46,13 @@ import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.Stack;
+
+//Cuenta donde se guardan los manuales: manuales615@gmail.com - M@nuales975
 
 public class MainActivity extends AppCompatActivity {
 
@@ -107,11 +114,107 @@ public class MainActivity extends AppCompatActivity {
         btnDescargar.setOnClickListener(view -> iniciarAutenticacionGoogle());
 
         Button btnBuscar = findViewById(R.id.btn_search_manual);
-        btnBuscar.setOnClickListener(view -> {
-            Toast.makeText(this, "Funcionalidad de búsqueda por implementar", Toast.LENGTH_SHORT).show();
-        });
+        btnBuscar.setOnClickListener(v -> mostrarOpcionesBusqueda());
 
     }
+
+    private void mostrarOpcionesBusqueda() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Buscar manual")
+                .setItems(new String[]{"Por nombre", "Por selectores"}, (dialog, which) -> {
+                    if (which == 0) {
+                        buscarPorNombre();
+                    } else if (which == 1) {
+                        buscarPorSelectores();
+                    }
+                });
+        builder.show();
+    }
+
+    private void buscarPorNombre() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Buscar manual por nombre");
+
+        final EditText input = new EditText(this);
+        builder.setView(input);
+
+        builder.setPositiveButton("Buscar", (dialog, which) -> {
+            String query = input.getText().toString();
+            filtrarPorNombre(query);
+        });
+        builder.setNegativeButton("Cancelar", (dialog, which) -> dialog.dismiss());
+        builder.show();
+    }
+
+    private void filtrarPorNombre(String query) {
+        String q = query.toLowerCase().trim();
+        List<ItemDrive> filtrados = new ArrayList<>();
+
+        for (ItemDrive item : items) {
+            // Busca tanto en carpetas como en archivos, insensible a mayúsculas
+            if (item.name.toLowerCase().contains(q)) {
+                filtrados.add(item);
+            }
+        }
+        adapter.updateData(filtrados);
+    }
+
+    private void buscarPorSelectores() {
+        // Extraer opciones únicas de los items
+        Set<String> tipos = new HashSet<>();
+        Set<String> marcas = new HashSet<>();
+        Set<String> modelos = new HashSet<>();
+
+        for (ItemDrive item : items) {
+            if (!item.esCarpeta && !item.rutaRelativa.isEmpty()) {
+                String[] partes = item.rutaRelativa.split("/");
+                if (partes.length > 0) tipos.add(partes[0]);
+                if (partes.length > 1) marcas.add(partes[1]);
+                if (partes.length > 2) modelos.add(partes[2]);
+            }
+        }
+
+        // Crear AlertDialog con 3 Spinners
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_selectores, null);
+        Spinner spinnerTipo = dialogView.findViewById(R.id.spinner_tipo);
+        Spinner spinnerMarca = dialogView.findViewById(R.id.spinner_marca);
+        Spinner spinnerModelo = dialogView.findViewById(R.id.spinner_modelo);
+
+        // Cargar sets en los spinners
+        spinnerTipo.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, new ArrayList<>(tipos)));
+        spinnerMarca.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, new ArrayList<>(marcas)));
+        spinnerModelo.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, new ArrayList<>(modelos)));
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Buscar manual por selectores");
+        builder.setView(dialogView);
+        builder.setPositiveButton("Filtrar", (d, w) -> {
+            String tipo = spinnerTipo.getSelectedItem() != null ? spinnerTipo.getSelectedItem().toString() : "";
+            String marca = spinnerMarca.getSelectedItem() != null ? spinnerMarca.getSelectedItem().toString() : "";
+            String modelo = spinnerModelo.getSelectedItem() != null ? spinnerModelo.getSelectedItem().toString() : "";
+            filtrarPorSelectores(tipo, marca, modelo);
+        });
+        builder.setNegativeButton("Cancelar", (d, w) -> d.dismiss());
+        builder.show();
+    }
+
+    private void filtrarPorSelectores(String tipo, String marca, String modelo) {
+        List<ItemDrive> filtrados = new ArrayList<>();
+        for (ItemDrive item : items) {
+            if (!item.esCarpeta) {
+                String[] partes = item.rutaRelativa.split("/");
+                if ((tipo.isEmpty() || (partes.length > 0 && partes[0].equals(tipo))) &&
+                        (marca.isEmpty() || (partes.length > 1 && partes[1].equals(marca))) &&
+                        (modelo.isEmpty() || (partes.length > 2 && partes[2].equals(modelo)))) {
+                    filtrados.add(item);
+                }
+            }
+        }
+        adapter.updateData(filtrados);
+    }
+
+
+
 
 
     @Override
@@ -405,18 +508,35 @@ public class MainActivity extends AppCompatActivity {
             List<ItemDrive> itemsLocales = new ArrayList<>();
 
             if (carpeta.exists()) {
-                recorrerCarpeta(carpeta, rutaRelativa, itemsLocales);
+                recorrerCarpetaRecursiva(carpeta, rutaRelativa, itemsLocales);
             }
 
             runOnUiThread(() -> {
                 items.clear();
                 items.addAll(itemsLocales);
                 adapter.updateData(itemsLocales);
-                currentRelativePath = rutaRelativa; // Actualizar la ruta actual
+                currentRelativePath = rutaRelativa;
             });
         }).start();
     }
 
+    private void recorrerCarpetaRecursiva(java.io.File carpetaActual, String rutaRelativa, List<ItemDrive> lista) {
+        java.io.File[] archivos = carpetaActual.listFiles();
+        if (archivos != null) {
+            for (java.io.File archivo : archivos) {
+                String rutaActual = rutaRelativa.isEmpty() ? archivo.getName() : rutaRelativa + "/" + archivo.getName();
+                if (archivo.isDirectory()) {
+                    lista.add(new ItemDrive("", archivo.getName(), true, rutaRelativa));
+                    recorrerCarpetaRecursiva(archivo, rutaActual, lista); // <-- Recursividad
+                } else if (archivo.isFile() && archivo.getName().endsWith(".pdf")) {
+                    String nombreArchivo = archivo.getName().replace(".pdf", "");
+                    ItemDrive item = new ItemDrive("", nombreArchivo, false, rutaRelativa);
+                    item.descargado = true;
+                    lista.add(item);
+                }
+            }
+        }
+    }
     private void recorrerCarpeta(java.io.File carpetaActual, String rutaRelativa, List<ItemDrive> lista) {
         java.io.File[] archivos = carpetaActual.listFiles();
         if (archivos != null) {
