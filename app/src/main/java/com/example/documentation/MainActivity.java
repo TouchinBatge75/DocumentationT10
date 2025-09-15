@@ -213,10 +213,6 @@ public class MainActivity extends AppCompatActivity {
         adapter.updateData(filtrados);
     }
 
-
-
-
-
     @Override
     public void onBackPressed() {
         if (pilaCarpetas.size() > 1) {
@@ -243,8 +239,6 @@ public class MainActivity extends AppCompatActivity {
             super.onBackPressed();
         }
     }
-
-
 
     private void eliminarCarpeta(ItemDrive item) {
         java.io.File carpetaLocal = new java.io.File(getFilesDir(),
@@ -508,7 +502,7 @@ public class MainActivity extends AppCompatActivity {
             List<ItemDrive> itemsLocales = new ArrayList<>();
 
             if (carpeta.exists()) {
-                recorrerCarpetaRecursiva(carpeta, rutaRelativa, itemsLocales);
+                recorrerCarpeta(carpeta, rutaRelativa, itemsLocales);
             }
 
             runOnUiThread(() -> {
@@ -520,23 +514,6 @@ public class MainActivity extends AppCompatActivity {
         }).start();
     }
 
-    private void recorrerCarpetaRecursiva(java.io.File carpetaActual, String rutaRelativa, List<ItemDrive> lista) {
-        java.io.File[] archivos = carpetaActual.listFiles();
-        if (archivos != null) {
-            for (java.io.File archivo : archivos) {
-                String rutaActual = rutaRelativa.isEmpty() ? archivo.getName() : rutaRelativa + "/" + archivo.getName();
-                if (archivo.isDirectory()) {
-                    lista.add(new ItemDrive("", archivo.getName(), true, rutaRelativa));
-                    recorrerCarpetaRecursiva(archivo, rutaActual, lista); // <-- Recursividad
-                } else if (archivo.isFile() && archivo.getName().endsWith(".pdf")) {
-                    String nombreArchivo = archivo.getName().replace(".pdf", "");
-                    ItemDrive item = new ItemDrive("", nombreArchivo, false, rutaRelativa);
-                    item.descargado = true;
-                    lista.add(item);
-                }
-            }
-        }
-    }
     private void recorrerCarpeta(java.io.File carpetaActual, String rutaRelativa, List<ItemDrive> lista) {
         java.io.File[] archivos = carpetaActual.listFiles();
         if (archivos != null) {
