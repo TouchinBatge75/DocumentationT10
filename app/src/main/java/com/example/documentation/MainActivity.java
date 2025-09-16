@@ -53,7 +53,6 @@ import java.util.Set;
 import java.util.Stack;
 
 //Cuenta donde se guardan los manuales: manuales615@gmail.com - M@nuales975
-
 public class MainActivity extends AppCompatActivity {
 
     private static final int RC_SIGN_IN = 1000;
@@ -63,10 +62,10 @@ public class MainActivity extends AppCompatActivity {
     private RecyclerView recyclerView;
     private ManualAdapter adapter;
     private List<ItemDrive> items = new ArrayList<>();
+    private List<ItemDrive> todosLosItems = new ArrayList<>(); // Lista completa
     private GoogleSignInAccount currentAccount;
     private String folderID = "11a5MPz8K1vFk7HhblB3DGW21CTRZn-uW";
     private String currentRelativePath = "";
-
     private Stack<String> pilaCarpetas = new Stack<>();
     private Stack<String> pilaRutas = new Stack<>();
 
@@ -121,14 +120,27 @@ public class MainActivity extends AppCompatActivity {
     private void mostrarOpcionesBusqueda() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Buscar manual")
-                .setItems(new String[]{"Por nombre", "Por selectores"}, (dialog, which) -> {
+                .setItems(new String[]{"Por nombre", "Por selectores", "Limpiar búsqueda"}, (dialog, which) -> {
                     if (which == 0) {
                         buscarPorNombre();
                     } else if (which == 1) {
                         buscarPorSelectores();
+                    } else if (which == 2) {
+                        limpiarBusqueda();
                     }
                 });
         builder.show();
+    }
+
+    private void limpiarBusqueda() {
+        if (currentAccount != null && mDriveService != null) {
+            // Si está autenticado, recargar desde Drive
+            listarCarpetaDrive(folderID, currentRelativePath);
+        } else {
+            // Si no está autenticado, recargar locales
+            cargarManualesLocales(currentRelativePath);
+        }
+        Toast.makeText(this, "Búsqueda limpiada", Toast.LENGTH_SHORT).show();
     }
 
     private void buscarPorNombre() {
@@ -148,17 +160,45 @@ public class MainActivity extends AppCompatActivity {
 
     private void filtrarPorNombre(String query) {
         String q = query.toLowerCase().trim();
+
+        Log.d(TAG, "Buscando: '" + q + "'");
+        Log.d(TAG, "Total de items en todosLosItems: " + todosLosItems.size());
+
+        if (todosLosItems.isEmpty()) {
+            Toast.makeText(this, "Primero carga los manuales sincronizando con Drive", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (q.isEmpty()) {
+            items.clear();
+            items.addAll(todosLosItems);
+            adapter.updateData(items);
+            Toast.makeText(this, "Mostrando todos los manuales", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         List<ItemDrive> filtrados = new ArrayList<>();
 
-        for (ItemDrive item : items) {
-            // Busca tanto en carpetas como en archivos, insensible a mayúsculas
-            if (item.name.toLowerCase().contains(q)) {
+        for (ItemDrive item : todosLosItems) {
+            // Para debugging, muestra lo que se está comparando
+            Log.d(TAG, "Comparando: '" + item.name.toLowerCase() + "' con '" + q + "'");
+
+            if (!item.esCarpeta && item.name.toLowerCase().contains(q)) {
                 filtrados.add(item);
+                Log.d(TAG, "✓ Encontrado: " + item.name);
             }
         }
+
+        if (filtrados.isEmpty()) {
+            Toast.makeText(this, "No se encontraron manuales con: '" + query + "'", Toast.LENGTH_LONG).show();
+        } else {
+            Toast.makeText(this, "Encontrados: " + filtrados.size() + " manuales", Toast.LENGTH_SHORT).show();
+        }
+
+        items.clear();
+        items.addAll(filtrados);
         adapter.updateData(filtrados);
     }
-
     private void buscarPorSelectores() {
         // Extraer opciones únicas de los items
         Set<String> tipos = new HashSet<>();
@@ -502,10 +542,14 @@ public class MainActivity extends AppCompatActivity {
             List<ItemDrive> itemsLocales = new ArrayList<>();
 
             if (carpeta.exists()) {
-                recorrerCarpeta(carpeta, rutaRelativa, itemsLocales);
+                recorrerCarpetaRecursiva(carpeta, rutaRelativa, itemsLocales);
             }
 
             runOnUiThread(() -> {
+                // ACTUALIZAR TODOSLOSITEMS
+                todosLosItems.clear();
+                todosLosItems.addAll(itemsLocales);
+
                 items.clear();
                 items.addAll(itemsLocales);
                 adapter.updateData(itemsLocales);
@@ -513,7 +557,6 @@ public class MainActivity extends AppCompatActivity {
             });
         }).start();
     }
-
     private void recorrerCarpeta(java.io.File carpetaActual, String rutaRelativa, List<ItemDrive> lista) {
         java.io.File[] archivos = carpetaActual.listFiles();
         if (archivos != null) {
@@ -531,9 +574,34 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     }
+    private void recorrerCarpetaRecursiva(java.io.File carpetaActual, String rutaRelativa, List<ItemDrive> lista) {
+        try {
+            java.io.File[] archivos = carpetaActual.listFiles();
+            if (archivos != null) {
+                for (java.io.File archivo : archivos) {
+                    if (archivo.isFile() && archivo.getName().toLowerCase().endsWith(".pdf")) {
+                        String nombreArchivo = archivo.getName().replace(".pdf", "");
+                        ItemDrive item = new ItemDrive("", nombreArchivo, false, rutaRelativa);
+                        item.descargado = true;
+                        lista.add(item);
+                    } else if (archivo.isDirectory()) {
+                        // Agregar la carpeta a la lista
+                        ItemDrive itemCarpeta = new ItemDrive("", archivo.getName(), true, rutaRelativa);
+                            lista.add(itemCarpeta);
+
+                        // Opcional: si quieres seguir recorriendo subcarpetas
+                        // String nuevaRuta = rutaRelativa.isEmpty() ? archivo.getName() : rutaRelativa + "/" + archivo.getName();
+                        // recorrerCarpetaRecursiva(archivo, nuevaRuta, lista);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error al recorrer carpeta: " + e.getMessage());
+        }
+    }
+
 
     private void listarCarpetaDrive(String folderId, String rutaRelativa) {
-        // Verificar que el servicio de Drive esté inicializado
         if (mDriveService == null) {
             Log.d(TAG, "Servicio de Drive no inicializado");
             return;
@@ -550,24 +618,19 @@ public class MainActivity extends AppCompatActivity {
                 if (result.getFiles() != null) {
                     for (File f : result.getFiles()) {
                         boolean esCarpeta = "application/vnd.google-apps.folder".equals(f.getMimeType());
-
                         boolean descargado = false;
                         String nombreArchivo = f.getName();
 
                         if (!esCarpeta) {
-                            // Asegurar extensión .pdf
                             if (!nombreArchivo.toLowerCase().endsWith(".pdf")) {
                                 nombreArchivo += ".pdf";
                             }
-
                             java.io.File archivoLocal = new java.io.File(getFilesDir(),
                                     "Manuales/" + (rutaRelativa.isEmpty() ? "" : rutaRelativa + "/") + nombreArchivo);
                             descargado = archivoLocal.exists();
                         }
 
-                        // Para mostrar en UI quitamos .pdf solo si es archivo
                         String nombreMostrar = esCarpeta ? nombreArchivo : nombreArchivo.replace(".pdf", "");
-
                         ItemDrive item = new ItemDrive(f.getId(), nombreMostrar, esCarpeta, rutaRelativa);
                         item.descargado = descargado;
                         itemsDrive.add(item);
@@ -575,18 +638,21 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 runOnUiThread(() -> {
+                    // ACTUALIZAR TODOSLOSITEMS
+                    todosLosItems.clear();
+                    todosLosItems.addAll(itemsDrive);
+
+                    items.clear();
+                    items.addAll(itemsDrive);
                     adapter.updateData(itemsDrive);
-                    currentRelativePath = rutaRelativa; // Actualizar la ruta actual
+                    currentRelativePath = rutaRelativa;
                 });
 
             } catch (Exception e) {
                 Log.e(TAG, "Error al listar carpeta de Drive: " + e.getMessage());
-                // Evitamos Toast molesto, solo log
             }
         }).start();
     }
-
-
     private void iniciarAutenticacionGoogle() {
         Intent signInIntent = mGoogleSignInClient.getSignInIntent();
         startActivityForResult(signInIntent, RC_SIGN_IN);
