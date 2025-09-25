@@ -11,6 +11,7 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
+        android:paddingTop="20dp"
         android:paddingBottom="8dp">
 
         <Button
@@ -20,6 +21,16 @@
             android:text="Sincronizar Drive"
             android:backgroundTint="#6AEBA4"
             android:textColor="@android:color/black"
+            android:layout_height="50dp"/>
+
+        <Button
+            android:id="@+id/btn_inicio"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:text="🏠 Inicio"
+            android:backgroundTint="#4FC3F7"
+            android:textColor="@android:color/black"
+            android:layout_marginStart="8dp"
             android:layout_height="50dp"/>
 
         <Button
