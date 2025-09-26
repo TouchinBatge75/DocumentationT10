@@ -130,6 +130,7 @@ public class MainActivity extends AppCompatActivity {
 
         Button btnInicio = findViewById(R.id.btn_inicio);
         btnInicio.setOnClickListener(v -> irARaiz());
+        actualizarBotonInicio();
     }
 
     private void mostrarOpcionesBusqueda() {
@@ -389,16 +390,23 @@ public class MainActivity extends AppCompatActivity {
     private void actualizarBotonInicio() {
         Button btnInicio = findViewById(R.id.btn_inicio);
 
-        if (currentRelativePath.isEmpty() && pilaCarpetas.size() <= 1) {
+        boolean estaEnRaizPura = currentRelativePath.isEmpty() && pilaCarpetas.size() <= 1;
+
+        boolean esModoBusqueda = !items.isEmpty() && (items.get(0).esHeaderSeccion ||!items.stream().anyMatch(item -> item.esCarpeta));
+
+        if (estaEnRaizPura && !esModoBusqueda) {
             btnInicio.setEnabled(false);
             btnInicio.setBackgroundTintList(ColorStateList.valueOf(
                     ContextCompat.getColor(this, android.R.color.darker_gray)));
             btnInicio.setText("🏠 En inicio");
+            Log.d(TAG, "Botón INICIO: Deshabilitado (en raíz)");
         } else {
             btnInicio.setEnabled(true);
             btnInicio.setBackgroundTintList(ColorStateList.valueOf(
                     ContextCompat.getColor(this, android.R.color.holo_blue_light)));
             btnInicio.setText("🏠 Inicio");
+            Log.d(TAG, "Botón INICIO: Habilitado (ruta: " + currentRelativePath +
+                    ", pila: " + pilaCarpetas.size() + ")");
         }
     }
 
