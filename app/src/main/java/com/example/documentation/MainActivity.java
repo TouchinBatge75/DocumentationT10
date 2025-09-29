@@ -178,49 +178,41 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        Log.d(TAG, "Buscando offline: '" + q + "'");
+        Log.d(TAG, "Buscando: '" + q + "'");
 
-        // ✅ BUSCAR EN TIEMPO REAL EN TODOS LOS ARCHIVOS LOCALES
         new Thread(() -> {
             List<ItemDrive> resultadosBusqueda = new ArrayList<>();
+            List<ItemDrive> driveEncontrados = new ArrayList<>();
 
-            // 1. BUSCAR EN ARCHIVOS LOCALES (RECORRER TODO EL SISTEMA DE ARCHIVOS)
             java.io.File carpetaRaiz = new java.io.File(getFilesDir(), "Manuales");
             if (carpetaRaiz.exists()) {
                 buscarArchivosLocalesRecursivo(carpetaRaiz, "", q, resultadosBusqueda);
             }
 
-            // 2. BUSCAR EN CACHE DE DRIVE (si está disponible y online)
-            List<ItemDrive> driveEncontrados = new ArrayList<>();
+
             if (currentAccount != null && mDriveService != null) {
                 for (ItemDrive item : cacheCompletoDrive) {
-                    if (!item.esCarpeta && item.name.toLowerCase().contains(q) && !item.descargado) {
-                        // Verificar que no esté ya en locales
-                        boolean existeEnLocales = false;
-                        for (ItemDrive local : resultadosBusqueda) {
-                            if (local.name.equalsIgnoreCase(item.name)) {
-                                existeEnLocales = true;
-                                break;
-                            }
-                        }
-                        if (!existeEnLocales) {
+                    if (!item.esCarpeta) {
+                        String nombreBusqueda = item.name.toLowerCase();
+                        if (nombreBusqueda.contains(q)) {
                             driveEncontrados.add(item);
+                            Log.d(TAG, "✓ ENCONTRADO EN DRIVE: " + item.name);
                         }
                     }
                 }
             }
 
-            // 3. ORGANIZAR RESULTADOS
+
             runOnUiThread(() -> {
                 List<ItemDrive> resultadosOrganizados = new ArrayList<>();
 
-                // Sección de locales
+
                 if (!resultadosBusqueda.isEmpty()) {
                     resultadosOrganizados.add(new ItemDrive("📁 MANUALES LOCALES (" + resultadosBusqueda.size() + ")", "local"));
                     resultadosOrganizados.addAll(resultadosBusqueda);
                 }
 
-                // Sección de Drive (solo si hay resultados y está online)
+
                 if (!driveEncontrados.isEmpty()) {
                     resultadosOrganizados.add(new ItemDrive("☁️ MANUALES EN DRIVE (" + driveEncontrados.size() + ")", "drive"));
                     resultadosOrganizados.addAll(driveEncontrados);
@@ -235,16 +227,17 @@ public class MainActivity extends AppCompatActivity {
                             Toast.LENGTH_SHORT).show();
                 }
 
-                // Actualizar la vista
                 items.clear();
                 items.addAll(resultadosOrganizados);
                 adapter.updateData(resultadosOrganizados);
                 actualizarBotonInicio();
+
+                Log.d(TAG, "Resultados búsqueda - Locales: " + resultadosBusqueda.size() + ", Drive: " + driveEncontrados.size());
             });
         }).start();
     }
 
-    // ✅ NUEVO MÉTODO: Buscar recursivamente en archivos locales
+
     private void buscarArchivosLocalesRecursivo(java.io.File carpeta, String rutaRelativa, String query, List<ItemDrive> resultados) {
         if (carpeta.exists() && carpeta.isDirectory()) {
             java.io.File[] archivos = carpeta.listFiles();
@@ -252,7 +245,6 @@ public class MainActivity extends AppCompatActivity {
                 for (java.io.File archivo : archivos) {
                     if (archivo.isFile() && archivo.getName().toLowerCase().endsWith(".pdf")) {
                         String nombreArchivo = archivo.getName().replace(".pdf", "");
-                        // ✅ BUSCAR COINCIDENCIA EN EL NOMBRE
                         if (nombreArchivo.toLowerCase().contains(query)) {
                             ItemDrive item = new ItemDrive("", nombreArchivo, false, rutaRelativa);
                             item.descargado = true;
@@ -260,7 +252,6 @@ public class MainActivity extends AppCompatActivity {
                             Log.d(TAG, "✓ ENCONTRADO LOCAL: " + nombreArchivo + " en " + rutaRelativa);
                         }
                     } else if (archivo.isDirectory()) {
-                        // Buscar recursivamente en subcarpetas
                         String nuevaRuta = rutaRelativa.isEmpty() ? archivo.getName() : rutaRelativa + "/" + archivo.getName();
                         buscarArchivosLocalesRecursivo(archivo, nuevaRuta, query, resultados);
                     }
@@ -268,7 +259,6 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     }
-
     private void buscarPorSelectores() {
         Set<String> tipos = new HashSet<>();
         Set<String> marcas = new HashSet<>();
@@ -367,18 +357,28 @@ public class MainActivity extends AppCompatActivity {
     }
     private void irARaiz() {
         Log.d(TAG, "=== NAVEGANDO A RAÍZ ===");
+        Log.d(TAG, "FolderID actual: " + folderID);
+        Log.d(TAG, "CurrentPath actual: " + currentRelativePath);
+        Log.d(TAG, "Tamaño pila carpetas: " + pilaCarpetas.size());
+        Log.d(TAG, "Tamaño pila rutas: " + pilaRutas.size());
 
-        // Limpiar las pilas de navegación
+        // Limpiar completamente las pilas de navegación
         pilaCarpetas.clear();
         pilaRutas.clear();
 
-        // Volver a la carpeta raíz
-        pilaCarpetas.push(folderID);
+        // Restablecer a los valores iniciales de la raíz
+        String folderIDRaiz = "11a5MPz8K1vFk7HhblB3DGW21CTRZn-uW"; // ID de la carpeta raíz de Drive
+        this.folderID = folderIDRaiz;
+        this.currentRelativePath = "";
+
+        // Volver a inicializar las pilas con la raíz
+        pilaCarpetas.push(folderIDRaiz);
         pilaRutas.push("");
 
-        // Restablecer variables actuales
-        this.folderID = folderID; // ID de la carpeta raíz de Drive
-        this.currentRelativePath = "";
+        Log.d(TAG, "Nuevo FolderID: " + folderID);
+        Log.d(TAG, "Nuevo CurrentPath: " + currentRelativePath);
+        Log.d(TAG, "Nueva pila carpetas: " + pilaCarpetas.size());
+        Log.d(TAG, "Nueva pila rutas: " + pilaRutas.size());
 
         // Mostrar contenido de la raíz
         sincronizarListaCompleta();
@@ -392,7 +392,23 @@ public class MainActivity extends AppCompatActivity {
 
         boolean estaEnRaizPura = currentRelativePath.isEmpty() && pilaCarpetas.size() <= 1;
 
-        boolean esModoBusqueda = !items.isEmpty() && (items.get(0).esHeaderSeccion ||!items.stream().anyMatch(item -> item.esCarpeta));
+        boolean esModoBusqueda;
+
+        if (items.isEmpty()) {
+            esModoBusqueda = false;
+        } else {
+            boolean tieneHeader = items.get(0).esHeaderSeccion;
+
+            boolean hayCarpetas = false;
+            for (ItemDrive item : items) {
+                if (item.esCarpeta) {
+                    hayCarpetas = true;
+                    break;
+                }
+            }
+
+            esModoBusqueda = tieneHeader || !hayCarpetas;
+        }
 
         if (estaEnRaizPura && !esModoBusqueda) {
             btnInicio.setEnabled(false);
@@ -610,7 +626,8 @@ public class MainActivity extends AppCompatActivity {
                             btnAccion.setEnabled(true);
                             btnAccion.setOnClickListener(v -> abrirArchivo(item));
 
-                            sincronizarListaCompleta();
+                            actualizarItemDescargado(item, position);
+
                             Toast.makeText(MainActivity.this, "Descargado: " + item.name, Toast.LENGTH_SHORT).show();
                         });
                     } catch (Exception e) {
@@ -640,7 +657,8 @@ public class MainActivity extends AppCompatActivity {
                     btnAccion.setEnabled(true);
                     btnAccion.setOnClickListener(v -> descargarArchivo(item, position));
 
-                    sincronizarListaCompleta();
+                    actualizarItemEliminado(item, position);
+
                     Toast.makeText(MainActivity.this, "Archivo eliminado: " + item.name, Toast.LENGTH_SHORT).show();
                 } else {
                     Toast.makeText(MainActivity.this, "Error al eliminar el archivo", Toast.LENGTH_SHORT).show();
@@ -673,6 +691,54 @@ public class MainActivity extends AppCompatActivity {
                 .setNegativeButton("No", null)
                 .show();
     }
+    private void actualizarItemDescargado(ItemDrive itemDescargado, int position) {
+        // 1. Actualizar el estado del item en la lista actual
+        if (position >= 0 && position < items.size()) {
+            items.get(position).descargado = true;
+            adapter.notifyItemChanged(position);
+        }
+
+
+        for (ItemDrive item : cacheCompletoDrive) {
+            if (item.id.equals(itemDescargado.id)) {
+                item.descargado = true;
+                break;
+            }
+        }
+
+
+        for (ItemDrive item : todosLosItems) {
+            if (item.name.equals(itemDescargado.name) && item.rutaRelativa.equals(itemDescargado.rutaRelativa)) {
+                item.descargado = true;
+                break;
+            }
+        }
+
+        Log.d(TAG, "Item actualizado: " + itemDescargado.name + " - Descargado: true");
+    }
+    private void actualizarItemEliminado(ItemDrive itemEliminado, int position) {
+        // 1. Actualizar el estado del item en la lista actual
+        if (position >= 0 && position < items.size()) {
+            items.get(position).descargado = false;
+            adapter.notifyItemChanged(position);
+        }
+
+        for (ItemDrive item : cacheCompletoDrive) {
+            if (item.id.equals(itemEliminado.id)) {
+                item.descargado = false;
+                break;
+            }
+        }
+
+        for (ItemDrive item : todosLosItems) {
+            if (item.name.equals(itemEliminado.name) && item.rutaRelativa.equals(itemEliminado.rutaRelativa)) {
+                item.descargado = false;
+                break;
+            }
+        }
+
+        Log.d(TAG, "Item actualizado: " + itemEliminado.name + " - Descargado: false");
+    }
 
     private void mostrarDialogoConfirmacionEliminacionCarpeta(ItemDrive item) {
         new AlertDialog.Builder(this)
@@ -688,7 +754,7 @@ public class MainActivity extends AppCompatActivity {
             java.io.File carpeta = new java.io.File(getFilesDir(), "Manuales/" + rutaRelativa);
             List<ItemDrive> itemsLocales = new ArrayList<>();
 
-            Log.d(TAG, "=== CARGANDO CARPETA JERÁRQUICA ===");
+            Log.d(TAG, "=== CARGANDO LOCALES ===");
             Log.d(TAG, "Ruta relativa: " + rutaRelativa);
             Log.d(TAG, "Ruta absoluta: " + carpeta.getAbsolutePath());
             Log.d(TAG, "Carpeta existe: " + carpeta.exists());
@@ -698,7 +764,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "Número de elementos: " + (archivos != null ? archivos.length : 0));
 
                 if (archivos != null) {
-
+                    // Primero agregar carpetas
                     for (java.io.File archivo : archivos) {
                         if (archivo.isDirectory()) {
                             ItemDrive itemCarpeta = new ItemDrive("", archivo.getName(), true, rutaRelativa);
@@ -707,7 +773,7 @@ public class MainActivity extends AppCompatActivity {
                         }
                     }
 
-
+                    // Luego agregar archivos PDF
                     for (java.io.File archivo : archivos) {
                         if (archivo.isFile() && archivo.getName().toLowerCase().endsWith(".pdf")) {
                             String nombreArchivo = archivo.getName().replace(".pdf", "");
@@ -718,6 +784,8 @@ public class MainActivity extends AppCompatActivity {
                         }
                     }
                 }
+            } else {
+                Log.d(TAG, "❌ La carpeta no existe: " + carpeta.getAbsolutePath());
             }
 
             runOnUiThread(() -> {
@@ -730,9 +798,15 @@ public class MainActivity extends AppCompatActivity {
                 currentRelativePath = rutaRelativa;
 
                 Log.d(TAG, "=== CARPETA CARGADA: " + itemsLocales.size() + " elementos ===");
-                Toast.makeText(MainActivity.this,
-                        "Cargados: " + itemsLocales.size() + " elementos",
-                        Toast.LENGTH_SHORT).show();
+
+                if (itemsLocales.isEmpty()) {
+                    Toast.makeText(MainActivity.this, "Carpeta vacía", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(MainActivity.this,
+                            "Cargados: " + itemsLocales.size() + " elementos",
+                            Toast.LENGTH_SHORT).show();
+                }
+
                 actualizarBotonInicio();
             });
         }).start();
@@ -882,11 +956,19 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void sincronizarListaCompleta() {
+        Log.d(TAG, "=== SINCRONIZANDO LISTA COMPLETA ===");
+        Log.d(TAG, "FolderID: " + folderID);
+        Log.d(TAG, "CurrentPath: " + currentRelativePath);
+        Log.d(TAG, "CurrentAccount: " + (currentAccount != null));
+        Log.d(TAG, "DriveService: " + (mDriveService != null));
+
         if (currentAccount != null && mDriveService != null) {
+            Log.d(TAG, "MODO: Drive + Locales");
+
             // Cargar vista normal de carpeta actual
             listarCarpetaDrive(folderID, currentRelativePath);
 
-            // ✅ CACHE COMPLETO EN BACKGROUND (SOLO para búsquedas, NO actualiza vista)
+            // CACHE COMPLETO EN BACKGROUND (SOLO para búsquedas, NO actualiza vista)
             new Thread(() -> {
                 List<ItemDrive> cacheCompleto = new ArrayList<>();
                 cargarTodoDriveRecursivo(folderID, "", cacheCompleto);
@@ -894,13 +976,14 @@ public class MainActivity extends AppCompatActivity {
                 runOnUiThread(() -> {
                     cacheCompletoDrive.clear();
                     cacheCompletoDrive.addAll(cacheCompleto);
-                    Log.d(TAG, "Cache Drive actualizado: " + cacheCompleto.size() + " archivos (solo para búsquedas)");
+                    Log.d(TAG, "✅ Cache Drive actualizado: " + cacheCompleto.size() + " archivos");
                     actualizarBotonInicio();
                 });
             }).start();
 
         } else {
-            // ✅ SOLO JERARQUÍA LOCAL
+            Log.d(TAG, "MODO: Solo Locales");
+            // SOLO JERARQUÍA LOCAL
             cargarManualesLocales(currentRelativePath);
         }
         actualizarBotonInicio();
