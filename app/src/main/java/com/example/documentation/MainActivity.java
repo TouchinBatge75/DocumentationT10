@@ -7,6 +7,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -60,7 +61,8 @@ public class MainActivity extends AppCompatActivity {
     private ManualAdapter adapter;
     private List<ItemDrive> items = new ArrayList<>();
     private List<ItemDrive> todosLosItems = new ArrayList<>();
-    private List<ItemDrive> cacheCompletoDrive = new ArrayList<>(); // Nuevo: cache de todos los archivos de Drive
+    private List<ItemDrive> cacheCompletoDrive = new ArrayList<>();
+    private String buscarDespuesDeAutenticar = "";
     private GoogleSignInAccount currentAccount;
     private String folderID = "11a5MPz8K1vFk7HhblB3DGW21CTRZn-uW";
     private String currentRelativePath = "";
@@ -169,6 +171,9 @@ public class MainActivity extends AppCompatActivity {
         builder.show();
     }
 
+    // Agrega esta variable con las otras variables de instancia
+
+
     private void filtrarPorNombre(String query) {
         String q = query.toLowerCase().trim();
 
@@ -180,63 +185,50 @@ public class MainActivity extends AppCompatActivity {
 
         Log.d(TAG, "Buscando: '" + q + "'");
 
-        new Thread(() -> {
-            List<ItemDrive> resultadosBusqueda = new ArrayList<>();
-            List<ItemDrive> driveEncontrados = new ArrayList<>();
 
-            java.io.File carpetaRaiz = new java.io.File(getFilesDir(), "Manuales");
-            if (carpetaRaiz.exists()) {
-                buscarArchivosLocalesRecursivo(carpetaRaiz, "", q, resultadosBusqueda);
-            }
+        if (currentAccount == null || mDriveService == null) {
+            Log.d(TAG, "No autenticado. Iniciando autenticación automática...");
+            buscarDespuesDeAutenticar = q; // Guardar búsqueda
+            iniciarAutenticacionGoogle();   // Autenticar automáticamente
+            return;
+        }
 
-
-            if (currentAccount != null && mDriveService != null) {
-                for (ItemDrive item : cacheCompletoDrive) {
-                    if (!item.esCarpeta) {
-                        String nombreBusqueda = item.name.toLowerCase();
-                        if (nombreBusqueda.contains(q)) {
-                            driveEncontrados.add(item);
-                            Log.d(TAG, "✓ ENCONTRADO EN DRIVE: " + item.name);
-                        }
-                    }
-                }
-            }
-
-
-            runOnUiThread(() -> {
-                List<ItemDrive> resultadosOrganizados = new ArrayList<>();
-
-
-                if (!resultadosBusqueda.isEmpty()) {
-                    resultadosOrganizados.add(new ItemDrive("📁 MANUALES LOCALES (" + resultadosBusqueda.size() + ")", "local"));
-                    resultadosOrganizados.addAll(resultadosBusqueda);
-                }
-
-
-                if (!driveEncontrados.isEmpty()) {
-                    resultadosOrganizados.add(new ItemDrive("☁️ MANUALES EN DRIVE (" + driveEncontrados.size() + ")", "drive"));
-                    resultadosOrganizados.addAll(driveEncontrados);
-                }
-
-                if (resultadosOrganizados.isEmpty()) {
-                    Toast.makeText(MainActivity.this, "No se encontró: '" + query + "'", Toast.LENGTH_LONG).show();
-                } else {
-                    Toast.makeText(MainActivity.this,
-                            "Encontrados: " + resultadosBusqueda.size() + " locales, " +
-                                    driveEncontrados.size() + " en Drive",
-                            Toast.LENGTH_SHORT).show();
-                }
-
-                items.clear();
-                items.addAll(resultadosOrganizados);
-                adapter.updateData(resultadosOrganizados);
-                actualizarBotonInicio();
-
-                Log.d(TAG, "Resultados búsqueda - Locales: " + resultadosBusqueda.size() + ", Drive: " + driveEncontrados.size());
-            });
-        }).start();
+        ejecutarBusquedaCompleta(q);
     }
 
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == RC_SIGN_IN) {
+            Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
+            try {
+                GoogleSignInAccount account = task.getResult(ApiException.class);
+                if (account != null) {
+                    obtenerManualesDesdeDrive(account);
+
+                    // ✅ CORRECCIÓN: Esperar a que el cache de Drive esté completamente cargado
+                    if (!buscarDespuesDeAutenticar.isEmpty()) {
+                        Log.d(TAG, "Autenticación exitosa. Esperando cache de Drive...");
+
+                        // Verificar periódicamente si el cache está listo
+                        new android.os.Handler().postDelayed(() -> {
+                            verificarYEjecutarBusqueda();
+                        }, 1000);
+                    }
+                }
+            } catch (ApiException e) {
+                Log.e(TAG, "Error en autenticación automática: " + e.getMessage());
+                Toast.makeText(this, "Error al conectar con Google Drive", Toast.LENGTH_SHORT).show();
+
+                if (!buscarDespuesDeAutenticar.isEmpty()) {
+                    ejecutarBusquedaSoloLocales(buscarDespuesDeAutenticar);
+                    buscarDespuesDeAutenticar = "";
+                }
+            }
+        }
+    }
 
     private void buscarArchivosLocalesRecursivo(java.io.File carpeta, String rutaRelativa, String query, List<ItemDrive> resultados) {
         if (carpeta.exists() && carpeta.isDirectory()) {
@@ -260,44 +252,217 @@ public class MainActivity extends AppCompatActivity {
         }
     }
     private void buscarPorSelectores() {
-        Set<String> tipos = new HashSet<>();
-        Set<String> marcas = new HashSet<>();
-        Set<String> modelos = new HashSet<>();
-
-        // Usar cache completo para los selectores
-        List<ItemDrive> fuenteBusqueda = new ArrayList<>();
-        fuenteBusqueda.addAll(todosLosItems);
-        fuenteBusqueda.addAll(cacheCompletoDrive);
-
-        for (ItemDrive item : fuenteBusqueda) {
-            if (!item.esCarpeta && !item.rutaRelativa.isEmpty()) {
-                String[] partes = item.rutaRelativa.split("/");
-                if (partes.length > 0) tipos.add(partes[0]);
-                if (partes.length > 1) marcas.add(partes[1]);
-                if (partes.length > 2) modelos.add(partes[2]);
-            }
+        if (currentAccount == null || mDriveService == null) {
+            Toast.makeText(this, "Primero conéctate a Google Drive", Toast.LENGTH_SHORT).show();
+            iniciarAutenticacionGoogle();
+            return;
         }
+        obtenerCarpetasNivel1();
+    }
 
+    private void obtenerCarpetasNivel1() {
+        new Thread(() -> {
+            try {
+                List<String> carpetasNivel1 = new ArrayList<>();
+
+                // Listar carpetas directamente en la raíz de tu folderID
+                FileList result = mDriveService.files().list()
+                        .setQ("'" + folderID + "' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false")
+                        .setFields("files(id, name)")
+                        .execute();
+
+                for (File file : result.getFiles()) {
+                    carpetasNivel1.add(file.getName());
+                }
+
+                runOnUiThread(() -> mostrarSelectorNivel1(carpetasNivel1));
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error al obtener carpetas nivel 1: " + e.getMessage());
+                runOnUiThread(() -> Toast.makeText(this, "Error al cargar carpetas", Toast.LENGTH_SHORT).show());
+            }
+        }).start();
+    }
+
+    private void mostrarSelectorNivel1(List<String> tipos) {
         View dialogView = getLayoutInflater().inflate(R.layout.dialog_selectores, null);
         Spinner spinnerTipo = dialogView.findViewById(R.id.spinner_tipo);
         Spinner spinnerMarca = dialogView.findViewById(R.id.spinner_marca);
         Spinner spinnerModelo = dialogView.findViewById(R.id.spinner_modelo);
 
-        spinnerTipo.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, new ArrayList<>(tipos)));
-        spinnerMarca.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, new ArrayList<>(marcas)));
-        spinnerModelo.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, new ArrayList<>(modelos)));
+        // Configurar spinner de tipo
+        ArrayAdapter<String> adapterTipo = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item, tipos);
+        spinnerTipo.setAdapter(adapterTipo);
+
+        // Deshabilitar los otros spinners inicialmente
+        spinnerMarca.setEnabled(false);
+        spinnerModelo.setEnabled(false);
+        spinnerMarca.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, new ArrayList<>()));
+        spinnerModelo.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, new ArrayList<>()));
+
+        // Cuando se selecciona un tipo, cargar marcas
+        spinnerTipo.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String tipoSeleccionado = parent.getItemAtPosition(position).toString();
+                obtenerCarpetasNivel2(tipoSeleccionado, spinnerMarca, spinnerModelo);
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Buscar manual por selectores");
+        builder.setTitle("Buscar por categorías");
         builder.setView(dialogView);
-        builder.setPositiveButton("Filtrar", (d, w) -> {
+        builder.setPositiveButton("Buscar", (d, w) -> {
             String tipo = spinnerTipo.getSelectedItem() != null ? spinnerTipo.getSelectedItem().toString() : "";
             String marca = spinnerMarca.getSelectedItem() != null ? spinnerMarca.getSelectedItem().toString() : "";
             String modelo = spinnerModelo.getSelectedItem() != null ? spinnerModelo.getSelectedItem().toString() : "";
-            filtrarPorSelectores(tipo, marca, modelo);
+            ejecutarBusquedaPorCarpetas(tipo, marca, modelo);
         });
         builder.setNegativeButton("Cancelar", (d, w) -> d.dismiss());
         builder.show();
+    }
+    private void obtenerCarpetasNivel2(String tipoSeleccionado, Spinner spinnerMarca, Spinner spinnerModelo) {
+        new Thread(() -> {
+            try {
+                // Primero encontrar el ID de la carpeta del tipo seleccionado
+                String queryTipo = "name = '" + tipoSeleccionado + "' and '" + folderID + "' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false";
+                FileList resultTipo = mDriveService.files().list().setQ(queryTipo).execute();
+
+                if (resultTipo.getFiles().isEmpty()) return;
+
+                String idTipo = resultTipo.getFiles().get(0).getId();
+                List<String> marcas = new ArrayList<>();
+
+                // Obtener carpetas dentro del tipo (marcas)
+                FileList resultMarcas = mDriveService.files().list()
+                        .setQ("'" + idTipo + "' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false")
+                        .setFields("files(name)")
+                        .execute();
+
+                for (File file : resultMarcas.getFiles()) {
+                    marcas.add(file.getName());
+                }
+
+                runOnUiThread(() -> {
+                    ArrayAdapter<String> adapterMarca = new ArrayAdapter<>(MainActivity.this,
+                            android.R.layout.simple_spinner_dropdown_item, marcas);
+                    spinnerMarca.setAdapter(adapterMarca);
+                    spinnerMarca.setEnabled(true);
+
+                    // Resetear modelo
+                    spinnerModelo.setAdapter(new ArrayAdapter<>(MainActivity.this,
+                            android.R.layout.simple_spinner_dropdown_item, new ArrayList<>()));
+                    spinnerModelo.setEnabled(false);
+
+                    // Configurar listener para marcas
+                    spinnerMarca.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                        @Override
+                        public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                            String marcaSeleccionada = parent.getItemAtPosition(position).toString();
+                            obtenerCarpetasNivel3(idTipo, marcaSeleccionada, spinnerModelo);
+                        }
+
+                        @Override
+                        public void onNothingSelected(AdapterView<?> parent) {}
+                    });
+                });
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error al obtener marcas: " + e.getMessage());
+            }
+        }).start();
+    }
+    private void obtenerCarpetasNivel3(String idTipo, String marcaSeleccionada, Spinner spinnerModelo) {
+        new Thread(() -> {
+            try {
+                // Encontrar ID de la marca seleccionada
+                String queryMarca = "name = '" + marcaSeleccionada + "' and '" + idTipo + "' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false";
+                FileList resultMarca = mDriveService.files().list().setQ(queryMarca).execute();
+
+                if (resultMarca.getFiles().isEmpty()) return;
+
+                String idMarca = resultMarca.getFiles().get(0).getId();
+                List<String> modelos = new ArrayList<>();
+
+                // Obtener carpetas dentro de la marca (modelos)
+                FileList resultModelos = mDriveService.files().list()
+                        .setQ("'" + idMarca + "' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false")
+                        .setFields("files(name)")
+                        .execute();
+
+                for (File file : resultModelos.getFiles()) {
+                    modelos.add(file.getName());
+                }
+
+                runOnUiThread(() -> {
+                    if (!modelos.isEmpty()) {
+                        ArrayAdapter<String> adapterModelo = new ArrayAdapter<>(MainActivity.this,
+                                android.R.layout.simple_spinner_dropdown_item, modelos);
+                        spinnerModelo.setAdapter(adapterModelo);
+                        spinnerModelo.setEnabled(true);
+                    } else {
+                        spinnerModelo.setEnabled(false);
+                    }
+                });
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error al obtener modelos: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    private void ejecutarBusquedaPorCarpetas(String tipo, String marca, String modelo) {
+        if (tipo.isEmpty()) {
+            Toast.makeText(this, "Selecciona al menos un tipo", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Navegar directamente a la carpeta seleccionada
+        new Thread(() -> {
+            try {
+                String currentFolderId = folderID;
+
+                // Navegar al tipo
+                String queryTipo = "name = '" + tipo + "' and '" + currentFolderId + "' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false";
+                FileList resultTipo = mDriveService.files().list().setQ(queryTipo).execute();
+                if (resultTipo.getFiles().isEmpty()) return;
+                String idTipo = resultTipo.getFiles().get(0).getId();
+
+                // Si hay marca seleccionada, navegar a ella
+                if (!marca.isEmpty()) {
+                    String queryMarca = "name = '" + marca + "' and '" + idTipo + "' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false";
+                    FileList resultMarca = mDriveService.files().list().setQ(queryMarca).execute();
+                    if (!resultMarca.getFiles().isEmpty()) {
+                        idTipo = resultMarca.getFiles().get(0).getId();
+
+                        // Si hay modelo seleccionado, navegar a él
+                        if (!modelo.isEmpty()) {
+                            String queryModelo = "name = '" + modelo + "' and '" + idTipo + "' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false";
+                            FileList resultModelo = mDriveService.files().list().setQ(queryModelo).execute();
+                            if (!resultModelo.getFiles().isEmpty()) {
+                                idTipo = resultModelo.getFiles().get(0).getId();
+                            }
+                        }
+                    }
+                }
+
+                final String finalFolderId = idTipo;
+                final String rutaFinal = tipo + (marca.isEmpty() ? "" : "/" + marca) + (modelo.isEmpty() ? "" : "/" + modelo);
+
+                runOnUiThread(() -> {
+                    abrirCarpeta(finalFolderId, rutaFinal);
+                    Toast.makeText(MainActivity.this, "Navegando a: " + rutaFinal, Toast.LENGTH_SHORT).show();
+                });
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error en búsqueda por carpetas: " + e.getMessage());
+                runOnUiThread(() -> Toast.makeText(MainActivity.this, "Error al navegar", Toast.LENGTH_SHORT).show());
+            }
+        }).start();
     }
 
     private void filtrarPorSelectores(String tipo, String marca, String modelo) {
@@ -347,6 +512,24 @@ public class MainActivity extends AppCompatActivity {
         items.clear();
         items.addAll(resultados);
         adapter.updateData(resultados);
+    }
+
+    private void verificarYEjecutarBusqueda() {
+        if (cacheCompletoDrive.isEmpty()) {
+            Log.d(TAG, "Cache de Drive aún vacío. Reintentando en 1 segundo...");
+            // Reintentar después de 1 segundo
+            new android.os.Handler().postDelayed(() -> {
+                verificarYEjecutarBusqueda();
+            }, 1000);
+        } else {
+            Log.d(TAG, "✅ Cache de Drive listo! Ejecutando búsqueda: " + buscarDespuesDeAutenticar);
+            ejecutarBusquedaCompleta(buscarDespuesDeAutenticar);
+            buscarDespuesDeAutenticar = "";
+
+            Toast.makeText(MainActivity.this,
+                    "Búsqueda completada en Drive y locales",
+                    Toast.LENGTH_SHORT).show();
+        }
     }
 
     private boolean coincideConSelectores(ItemDrive item, String tipo, String marca, String modelo) {
@@ -811,31 +994,98 @@ public class MainActivity extends AppCompatActivity {
             });
         }).start();
     }
-    private void recorrerCarpetaRecursiva(java.io.File carpetaActual, String rutaRelativa, List<ItemDrive> lista) {
-        try {
-            java.io.File[] archivos = carpetaActual.listFiles();
-            Log.d(TAG, "Recorriendo: " + carpetaActual.getAbsolutePath());
 
-            if (archivos != null) {
-                for (java.io.File archivo : archivos) {
-                    Log.d(TAG, "Procesando: " + archivo.getName() + " - Es directorio: " + archivo.isDirectory());
+    private void ejecutarBusquedaCompleta(String q) {
+        new Thread(() -> {
+            List<ItemDrive> resultadosBusqueda = new ArrayList<>();
+            List<ItemDrive> driveEncontrados = new ArrayList<>();
 
-                    if (archivo.isFile() && archivo.getName().toLowerCase().endsWith(".pdf")) {
-                        String nombreArchivo = archivo.getName().replace(".pdf", "");
-                        ItemDrive item = new ItemDrive("", nombreArchivo, false, rutaRelativa);
-                        item.descargado = true;
-                        lista.add(item);
-                        Log.d(TAG, "✓ PDF agregado: " + nombreArchivo);
-                    } else if (archivo.isDirectory()) {
-                        ItemDrive itemCarpeta = new ItemDrive("", archivo.getName(), true, rutaRelativa);
-                        lista.add(itemCarpeta);
-                        Log.d(TAG, "✓ Carpeta agregada: " + archivo.getName());
+            // 1. BUSCAR EN ARCHIVOS LOCALES
+            java.io.File carpetaRaiz = new java.io.File(getFilesDir(), "Manuales");
+            if (carpetaRaiz.exists()) {
+                buscarArchivosLocalesRecursivo(carpetaRaiz, "", q, resultadosBusqueda);
+            }
+
+            // 2. BUSCAR EN CACHE DE DRIVE (si está autenticado)
+            if (currentAccount != null && mDriveService != null) {
+                for (ItemDrive item : cacheCompletoDrive) {
+                    if (!item.esCarpeta) {
+                        String nombreBusqueda = item.name.toLowerCase();
+                        if (nombreBusqueda.contains(q)) {
+                            driveEncontrados.add(item);
+                            Log.d(TAG, "✓ ENCONTRADO EN DRIVE: " + item.name);
+                        }
                     }
                 }
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Error al recorrer carpeta: " + e.getMessage());
-        }
+
+            // 3. ORGANIZAR RESULTADOS
+            runOnUiThread(() -> {
+                List<ItemDrive> resultadosOrganizados = new ArrayList<>();
+
+                if (!resultadosBusqueda.isEmpty()) {
+                    resultadosOrganizados.add(new ItemDrive("📁 MANUALES LOCALES (" + resultadosBusqueda.size() + ")", "local"));
+                    resultadosOrganizados.addAll(resultadosBusqueda);
+                }
+
+                if (!driveEncontrados.isEmpty()) {
+                    resultadosOrganizados.add(new ItemDrive("☁️ MANUALES EN DRIVE (" + driveEncontrados.size() + ")", "drive"));
+                    resultadosOrganizados.addAll(driveEncontrados);
+                }
+
+                if (resultadosOrganizados.isEmpty()) {
+                    Toast.makeText(MainActivity.this, "No se encontró: '" + q + "'", Toast.LENGTH_LONG).show();
+                } else {
+                    String mensaje = "Encontrados: " + resultadosBusqueda.size() + " locales";
+                    if (!driveEncontrados.isEmpty()) {
+                        mensaje += ", " + driveEncontrados.size() + " en Drive";
+                    }
+                    Toast.makeText(MainActivity.this, mensaje, Toast.LENGTH_SHORT).show();
+                }
+
+                items.clear();
+                items.addAll(resultadosOrganizados);
+                adapter.updateData(resultadosOrganizados);
+                actualizarBotonInicio();
+
+                Log.d(TAG, "Resultados búsqueda - Locales: " + resultadosBusqueda.size() + ", Drive: " + driveEncontrados.size());
+            });
+        }).start();
+    }
+
+    private void ejecutarBusquedaSoloLocales(String query) {
+        String q = query.toLowerCase().trim();
+
+        new Thread(() -> {
+            List<ItemDrive> resultadosBusqueda = new ArrayList<>();
+
+            java.io.File carpetaRaiz = new java.io.File(getFilesDir(), "Manuales");
+            if (carpetaRaiz.exists()) {
+                buscarArchivosLocalesRecursivo(carpetaRaiz, "", q, resultadosBusqueda);
+            }
+
+            runOnUiThread(() -> {
+                List<ItemDrive> resultadosOrganizados = new ArrayList<>();
+
+                if (!resultadosBusqueda.isEmpty()) {
+                    resultadosOrganizados.add(new ItemDrive("📁 MANUALES LOCALES (" + resultadosBusqueda.size() + ")", "local"));
+                    resultadosOrganizados.addAll(resultadosBusqueda);
+                }
+
+                if (resultadosOrganizados.isEmpty()) {
+                    Toast.makeText(MainActivity.this, "No se encontró: '" + query + "'", Toast.LENGTH_LONG).show();
+                } else {
+                    Toast.makeText(MainActivity.this,
+                            "Encontrados: " + resultadosBusqueda.size() + " locales",
+                            Toast.LENGTH_SHORT).show();
+                }
+
+                items.clear();
+                items.addAll(resultadosOrganizados);
+                adapter.updateData(resultadosOrganizados);
+                actualizarBotonInicio();
+            });
+        }).start();
     }
 
     private void listarCarpetaDrive(String folderId, String rutaRelativa) {
@@ -885,7 +1135,6 @@ public class MainActivity extends AppCompatActivity {
         }).start();
     }
 
-    // NUEVO: Cargar recursivamente todo el contenido de Drive
     private void cargarTodoDriveRecursivo(String folderId, String ruta, List<ItemDrive> acumulador) {
         if (mDriveService == null) return;
 
@@ -896,11 +1145,14 @@ public class MainActivity extends AppCompatActivity {
                     .execute();
 
             if (result.getFiles() != null) {
+                Log.d(TAG, "📂 Cargando carpeta Drive: " + folderId + " - Elementos: " + result.getFiles().size());
+
                 for (File f : result.getFiles()) {
                     boolean esCarpeta = "application/vnd.google-apps.folder".equals(f.getMimeType());
                     String nuevaRuta = ruta.isEmpty() ? f.getName() : ruta + "/" + f.getName();
 
                     if (esCarpeta) {
+                        Log.d(TAG, "📁 Carpeta encontrada: " + f.getName());
                         cargarTodoDriveRecursivo(f.getId(), nuevaRuta, acumulador);
                     } else {
                         String nombreArchivo = f.getName();
@@ -913,47 +1165,17 @@ public class MainActivity extends AppCompatActivity {
                         ItemDrive item = new ItemDrive(f.getId(), nombreArchivo.replace(".pdf", ""), false, ruta);
                         item.descargado = descargado;
                         acumulador.add(item);
+
+                        Log.d(TAG, "✅ Archivo Drive agregado al cache: " + item.name + " - Ruta: " + ruta);
                     }
                 }
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error en carga recursiva: " + e.getMessage());
+            Log.e(TAG, "❌ Error en carga recursiva de Drive: " + e.getMessage());
         }
     }
-    private void rescannearArchivosLocalesCompletamente() {
-        new Thread(() -> {
-            java.io.File carpetaRaiz = new java.io.File(getFilesDir(), "Manuales");
-            List<ItemDrive> todosLosArchivosLocales = new ArrayList<>();
 
-            rescannearRecursivo(carpetaRaiz, "", todosLosArchivosLocales);
 
-            runOnUiThread(() -> {
-                todosLosItems.clear();
-                todosLosItems.addAll(todosLosArchivosLocales);
-                Log.d(TAG, "Rescaneo completo. Archivos locales encontrados: " + todosLosArchivosLocales.size());
-            });
-        }).start();
-    }
-
-    private void rescannearRecursivo(java.io.File carpeta, String rutaRelativa, List<ItemDrive> resultados) {
-        if (carpeta.exists() && carpeta.isDirectory()) {
-            java.io.File[] archivos = carpeta.listFiles();
-            if (archivos != null) {
-                for (java.io.File archivo : archivos) {
-                    if (archivo.isFile() && archivo.getName().toLowerCase().endsWith(".pdf")) {
-                        String nombre = archivo.getName().replace(".pdf", "");
-                        ItemDrive item = new ItemDrive("", nombre, false, rutaRelativa);
-                        item.descargado = true;
-                        resultados.add(item);
-                        Log.d(TAG, "✓ Encontrado: " + nombre + " en " + rutaRelativa);
-                    } else if (archivo.isDirectory()) {
-                        String nuevaRuta = rutaRelativa.isEmpty() ? archivo.getName() : rutaRelativa + "/" + archivo.getName();
-                        rescannearRecursivo(archivo, nuevaRuta, resultados);
-                    }
-                }
-            }
-        }
-    }
 
     private void sincronizarListaCompleta() {
         Log.d(TAG, "=== SINCRONIZANDO LISTA COMPLETA ===");
@@ -961,15 +1183,17 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "CurrentPath: " + currentRelativePath);
         Log.d(TAG, "CurrentAccount: " + (currentAccount != null));
         Log.d(TAG, "DriveService: " + (mDriveService != null));
+        Log.d(TAG, "Cache actual: " + cacheCompletoDrive.size() + " archivos");
 
         if (currentAccount != null && mDriveService != null) {
-            Log.d(TAG, "MODO: Drive + Locales");
+            Log.d(TAG, "🔄 MODO: Drive + Locales");
 
             // Cargar vista normal de carpeta actual
             listarCarpetaDrive(folderID, currentRelativePath);
 
-            // CACHE COMPLETO EN BACKGROUND (SOLO para búsquedas, NO actualiza vista)
+            // CACHE COMPLETO EN BACKGROUND
             new Thread(() -> {
+                Log.d(TAG, "🔄 Iniciando carga del cache de Drive...");
                 List<ItemDrive> cacheCompleto = new ArrayList<>();
                 cargarTodoDriveRecursivo(folderID, "", cacheCompleto);
 
@@ -977,13 +1201,19 @@ public class MainActivity extends AppCompatActivity {
                     cacheCompletoDrive.clear();
                     cacheCompletoDrive.addAll(cacheCompleto);
                     Log.d(TAG, "✅ Cache Drive actualizado: " + cacheCompleto.size() + " archivos");
+
+                    // ✅ NUEVO: Verificar archivos en el cache
+                    for (int i = 0; i < Math.min(5, cacheCompletoDrive.size()); i++) {
+                        ItemDrive item = cacheCompletoDrive.get(i);
+                        Log.d(TAG, "📄 Cache[" + i + "]: " + item.name + " - Ruta: " + item.rutaRelativa);
+                    }
+
                     actualizarBotonInicio();
                 });
             }).start();
 
         } else {
-            Log.d(TAG, "MODO: Solo Locales");
-            // SOLO JERARQUÍA LOCAL
+            Log.d(TAG, "📱 MODO: Solo Locales");
             cargarManualesLocales(currentRelativePath);
         }
         actualizarBotonInicio();
@@ -992,23 +1222,6 @@ public class MainActivity extends AppCompatActivity {
     private void iniciarAutenticacionGoogle() {
         Intent signInIntent = mGoogleSignInClient.getSignInIntent();
         startActivityForResult(signInIntent, RC_SIGN_IN);
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-
-        if (requestCode == RC_SIGN_IN) {
-            Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
-            try {
-                GoogleSignInAccount account = task.getResult(ApiException.class);
-                if (account != null) {
-                    obtenerManualesDesdeDrive(account);
-                }
-            } catch (ApiException e) {
-                Toast.makeText(this, "Error al iniciar sesión", Toast.LENGTH_SHORT).show();
-            }
-        }
     }
 
     private void obtenerManualesDesdeDrive(GoogleSignInAccount account) {

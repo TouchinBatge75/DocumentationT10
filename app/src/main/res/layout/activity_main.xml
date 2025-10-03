@@ -18,7 +18,7 @@
             android:id="@+id/btn_descargar_manuales"
             android:layout_width="0dp"
             android:layout_weight="1"
-            android:text="Sincronizar Drive"
+            android:text="Buscar Manualmente"
             android:backgroundTint="#6AEBA4"
             android:textColor="@android:color/black"
             android:layout_height="50dp"/>
