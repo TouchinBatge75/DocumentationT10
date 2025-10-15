@@ -1,4 +1,4 @@
-package com.example.documentation;
+package com.example.documentation.models;
 
 public class ArchivoDescargado {
     private String id;

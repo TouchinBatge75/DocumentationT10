@@ -1,4 +1,4 @@
-package com.example.documentation;
+package com.example.documentation.activities;
 
 import android.annotation.SuppressLint;
 import android.graphics.Bitmap;
@@ -28,6 +28,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.example.documentation.models.ExtractorPDF;
+import com.example.documentation.adapters.PdfDocumentAdapter;
+import com.example.documentation.R;
 import com.github.chrisbanes.photoview.PhotoView;
 
 public class VisorManualActivity extends AppCompatActivity {

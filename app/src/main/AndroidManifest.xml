@@ -20,7 +20,7 @@
 
         <!-- SplashActivity será la que inicie la app -->
         <activity
-            android:name=".SplashActivity"
+            android:name=".activities.SplashActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
@@ -28,7 +28,7 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".VisorManualActivity" />
+        <activity android:name=".activities.VisorManualActivity" />
 
         <!-- Metadatos para autenticación de Google -->
         <meta-data
@@ -37,7 +37,7 @@
 
         <!-- MainActivity sin intent-filter -->
         <activity
-            android:name=".MainActivity"
+            android:name=".activities.MainActivity"
             android:exported="true" />
     </application>
 

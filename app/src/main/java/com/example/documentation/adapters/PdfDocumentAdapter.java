@@ -1,4 +1,4 @@
-package com.example.documentation;
+package com.example.documentation.adapters;
 
 import android.content.Context;
 import android.graphics.pdf.PdfRenderer;

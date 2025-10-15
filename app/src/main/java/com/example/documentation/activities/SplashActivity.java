@@ -1,4 +1,4 @@
-package com.example.documentation;
+package com.example.documentation.activities;
 
 
 //Imports
@@ -10,6 +10,8 @@ import android.view.animation.Animation; //Base class for animations
 import android.view.animation.AnimationUtils; //For load animations on XML
 import android.widget.ImageView;
 import android.widget.TextView;
+
+import com.example.documentation.R;
 
 public class SplashActivity extends Activity
 {
