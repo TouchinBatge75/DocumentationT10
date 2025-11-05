@@ -118,10 +118,4 @@ public class LocalFilesRepository {
         }
         return archivo.delete();
     }
-
-    public boolean archivoExiste(Manual item) {
-        File archivoLocal = new File(context.getFilesDir(),
-                "Manuales/" + (item.rutaRelativa.isEmpty() ? "" : item.rutaRelativa + "/") + item.nombre + ".pdf");
-        return archivoLocal.exists();
-    }
 }

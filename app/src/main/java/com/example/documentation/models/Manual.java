@@ -36,4 +36,6 @@ public class Manual {
 
     // Constructor vacío
     public Manual() {}
+
+
 }

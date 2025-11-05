@@ -5,6 +5,7 @@ import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.pdf.PdfRenderer;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.ParcelFileDescriptor;
 import android.print.PrintAttributes;
 import android.print.PrintDocumentAdapter;
@@ -23,15 +24,15 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.SearchView;
 import androidx.appcompat.widget.Toolbar;
 
+import com.example.documentation.R;
+import com.example.documentation.adapters.PdfDocumentAdapter;
+import com.example.documentation.models.ExtractorPDF;
+import com.github.chrisbanes.photoview.PhotoView;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-
-import com.example.documentation.models.ExtractorPDF;
-import com.example.documentation.adapters.PdfDocumentAdapter;
-import com.example.documentation.R;
-import com.github.chrisbanes.photoview.PhotoView;
 
 public class VisorManualActivity extends AppCompatActivity {
 
@@ -69,6 +70,11 @@ public class VisorManualActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_visor_manual);
 
+        // ✅ OCULTAR ACTION BAR AL INICIAR
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().hide();
+        }
+
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
@@ -88,7 +94,6 @@ public class VisorManualActivity extends AppCompatActivity {
         pageInput.setText(String.valueOf(currentPageIndex + 1));
         pageTotal.setText("/" + pageCount);
 
-
         pageInput.setOnEditorActionListener((v, actionId, event) -> {
             String input = pageInput.getText().toString();
             if (!input.isEmpty()) {
@@ -101,17 +106,6 @@ public class VisorManualActivity extends AppCompatActivity {
                 }
             }
             return true;
-        });
-
-        // Listener para detectar taps en tercios de la pantalla
-        pdfImageView.setOnViewTapListener((view, x, y) -> {
-            int width = view.getWidth();
-
-            if (x < width / 3f) {
-                mostrarPaginaAnterior();
-            } else if (x > (width * 2f / 3f)) {
-                mostrarPaginaSiguiente();
-            }
         });
     }
 
@@ -159,6 +153,9 @@ public class VisorManualActivity extends AppCompatActivity {
 
                     mostrarPagina(currentPageIndex);
 
+                    // ✅ CONFIGURAR TOGGLE DEL ACTION BAR
+                    setupToggleActionBar();
+
                     // Extraer texto en segundo plano para búsqueda
                     new Thread(() -> {
                         ExtractorPDF extractor = new ExtractorPDF(this);
@@ -183,7 +180,40 @@ public class VisorManualActivity extends AppCompatActivity {
         }
     }
 
+    // ✅ NUEVO: Configurar toggle del ActionBar con clicks en la imagen
+    private void setupToggleActionBar() {
+        pdfImageView.setOnViewTapListener((view, x, y) -> {
+            int width = view.getWidth();
 
+            // Si el tap es en el CENTRO (no en los bordes), toggle ActionBar
+            if (x >= width / 3f && x <= (width * 2f / 3f)) {
+                toggleActionBar();
+            } else if (x < width / 3f) {
+                // Tap izquierdo - página anterior
+                mostrarPaginaAnterior();
+            } else if (x > (width * 2f / 3f)) {
+                // Tap derecho - página siguiente
+                mostrarPaginaSiguiente();
+            }
+        });
+    }
+
+    // ✅ NUEVO: Alternar visibilidad del ActionBar
+    private void toggleActionBar() {
+        if (getSupportActionBar() != null) {
+            if (getSupportActionBar().isShowing()) {
+                getSupportActionBar().hide();
+            } else {
+                getSupportActionBar().show();
+                // Ocultar automáticamente después de 3 segundos
+                new Handler().postDelayed(() -> {
+                    if (getSupportActionBar() != null) {
+                        getSupportActionBar().hide();
+                    }
+                }, 3000);
+            }
+        }
+    }
 
     private void abrirRenderer(File file) throws IOException {
         parcelFileDescriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY);
@@ -227,7 +257,6 @@ public class VisorManualActivity extends AppCompatActivity {
             Toast.makeText(this, "Error al mostrar página", Toast.LENGTH_SHORT).show();
         }
     }
-
 
     private void actualizarIndicadorPagina() {
         if (tvPageIndicator != null) {
@@ -285,7 +314,6 @@ public class VisorManualActivity extends AppCompatActivity {
         }
     }
 
-
     private void buscarPalabraEnPdf(String palabraClave) {
         if (textoCompletoPdf != null && palabraClave != null && !palabraClave.isEmpty()) {
             currentSearchQuery = palabraClave;
@@ -333,6 +361,15 @@ public class VisorManualActivity extends AppCompatActivity {
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
             public boolean onQueryTextSubmit(String query) {
+                // ✅ MOSTRAR ACTION BAR TEMPORALMENTE AL BUSCAR
+                if (getSupportActionBar() != null) {
+                    getSupportActionBar().show();
+                    new Handler().postDelayed(() -> {
+                        if (getSupportActionBar() != null) {
+                            getSupportActionBar().hide();
+                        }
+                    }, 5000);
+                }
                 buscarPalabraEnPdf(query);
                 return true;
             }
@@ -349,6 +386,15 @@ public class VisorManualActivity extends AppCompatActivity {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == R.id.action_print) {
+            // ✅ MOSTRAR ACTION BAR TEMPORALMENTE AL IMPRIMIR
+            if (getSupportActionBar() != null) {
+                getSupportActionBar().show();
+                new Handler().postDelayed(() -> {
+                    if (getSupportActionBar() != null) {
+                        getSupportActionBar().hide();
+                    }
+                }, 3000);
+            }
             imprimirPDF();
             return true;
         }
@@ -377,7 +423,20 @@ public class VisorManualActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        // ✅ RESTAURAR ACTION BAR AL SALIR
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().show();
+        }
         cerrarRecursos();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        // ✅ RESTAURAR ACTION BAR AL PAUSAR TAMBIÉN
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().show();
+        }
     }
 
     private void cerrarRecursos() {
