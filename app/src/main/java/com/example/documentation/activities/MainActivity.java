@@ -43,6 +43,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Stack;
 
+import com.example.documentation.viewmodels.MainViewModel;
+import androidx.lifecycle.ViewModelProvider;
+
 public class MainActivity extends AppCompatActivity {
 
     private static final int RC_SIGN_IN = 1000;
@@ -63,6 +66,7 @@ public class MainActivity extends AppCompatActivity {
     private String currentRelativePath = "";
     private Stack<String> pilaCarpetas = new Stack<>();
     private Stack<String> pilaRutas = new Stack<>();
+    private MainViewModel viewModel;
 
     // Métodos para que el adapter acceda a los repositories
     public DriveRepository getDriveRepository() {
@@ -78,11 +82,28 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Inicializar repositories
-        localFilesRepository = new LocalFilesRepository(this);
 
-        pilaCarpetas.push(folderID);
-        pilaRutas.push("");
+        viewModel = new ViewModelProvider(this).get(MainViewModel.class);
+
+        this.folderID = viewModel.currentFolderID;
+        this.currentRelativePath = viewModel.currentRelativePath;
+        this.pilaCarpetas = viewModel.pilaCarpetas;
+        this.pilaRutas = viewModel.pilaRutas;
+        this.buscarDespuesDeAutenticar = viewModel.buscarDespuesDeAutenticar;
+        this.cacheCompletoDrive = viewModel.cacheCompletoDrive;
+
+        // 3. INICIALIZAR SOLO SI LAS PILAS ESTÁN VACÍAS (EVITA DUPLICADOS)
+        if (pilaCarpetas.isEmpty()) {
+            pilaCarpetas.push(folderID);
+            pilaRutas.push("");
+
+
+            viewModel.pilaCarpetas = this.pilaCarpetas;
+            viewModel.pilaRutas = this.pilaRutas;
+        }
+
+
+        localFilesRepository = new LocalFilesRepository(this);
 
         recyclerView = findViewById(R.id.rv_manuales);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
@@ -90,7 +111,9 @@ public class MainActivity extends AppCompatActivity {
         adapter = new ManualAdapter(items, this);
         recyclerView.setAdapter(adapter);
 
-        cargarManualesLocales("");
+
+        sincronizarListaCompleta();
+
 
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                 .requestEmail()
@@ -98,6 +121,7 @@ public class MainActivity extends AppCompatActivity {
                 .build();
 
         mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
+
 
         Button btnDescargar = findViewById(R.id.btn_descargar_manuales);
         btnDescargar.setOnClickListener(view -> iniciarAutenticacionGoogle());
@@ -365,18 +389,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void irARaiz() {
-        Log.d(TAG, "=== NAVEGANDO A RAÍZ ===");
+        Log.d(TAG, "=== VOLVIENDO AL INICIO ===");
 
-        pilaCarpetas.clear();
-        pilaRutas.clear();
+        // Le decimos al ViewModel que reinicie todo al estado inicial
+        viewModel.resetToRoot();
 
-        String folderIDRaiz = "11a5MPz8K1vFk7HhblB3DGW21CTRZn-uW";
-        this.folderID = folderIDRaiz;
-        this.currentRelativePath = "";
+        // Sincronizamos nuestra actividad con lo que acaba de hacer el ViewModel
+        this.folderID = viewModel.currentFolderID;
+        this.currentRelativePath = viewModel.currentRelativePath;
+        this.pilaCarpetas = viewModel.pilaCarpetas;
+        this.pilaRutas = viewModel.pilaRutas;
 
-        pilaCarpetas.push(folderIDRaiz);
-        pilaRutas.push("");
-
+        // Actualizamos la pantalla con la nueva información
         sincronizarListaCompleta();
         Toast.makeText(this, "🏠 Volviendo al inicio", Toast.LENGTH_SHORT).show();
     }
@@ -431,6 +455,11 @@ public class MainActivity extends AppCompatActivity {
 
             this.folderID = carpetaAnterior;
             this.currentRelativePath = rutaAnterior;
+
+            viewModel.currentFolderID = this.folderID;
+            viewModel.currentRelativePath = this.currentRelativePath;
+            viewModel.pilaCarpetas = this.pilaCarpetas;
+            viewModel.pilaRutas = this.pilaRutas;
 
             sincronizarListaCompleta();
             actualizarBotonInicio();
@@ -636,6 +665,12 @@ public class MainActivity extends AppCompatActivity {
     private void sincronizarListaCompleta() {
         Log.d(TAG, "=== SINCRONIZANDO LISTA COMPLETA ===");
 
+        viewModel.currentFolderID = this.folderID;
+        viewModel.currentRelativePath = this.currentRelativePath;
+        viewModel.pilaCarpetas = this.pilaCarpetas;
+        viewModel.pilaRutas = this.pilaRutas;
+        viewModel.buscarDespuesDeAutenticar = this.buscarDespuesDeAutenticar;
+
         if (currentAccount != null && driveRepository != null) {
             Log.d(TAG, "🔄 MODO: Drive + Locales");
             listarCarpetaDrive(folderID, currentRelativePath);
@@ -647,6 +682,7 @@ public class MainActivity extends AppCompatActivity {
                 runOnUiThread(() -> {
                     cacheCompletoDrive.clear();
                     cacheCompletoDrive.addAll(cacheCompleto);
+                    viewModel.cacheCompletoDrive = cacheCompletoDrive;
                     Log.d(TAG, "✅ Cache Drive actualizado: " + cacheCompleto.size() + " archivos");
                     actualizarBotonInicio();
                 });
@@ -694,6 +730,11 @@ public class MainActivity extends AppCompatActivity {
 
         this.folderID = nuevaCarpetaID;
         this.currentRelativePath = nuevaRutaRelativa;
+
+        viewModel.currentFolderID = this.folderID;
+        viewModel.currentRelativePath = this.currentRelativePath;
+        viewModel.pilaCarpetas = this.pilaCarpetas;
+        viewModel.pilaRutas = this.pilaRutas;
 
         sincronizarListaCompleta();
         actualizarBotonInicio();

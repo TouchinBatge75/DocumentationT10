@@ -70,14 +70,14 @@ public class DriveRepository {
                     .execute();
 
             if (result.getFiles() != null) {
-                Log.d(TAG, "📂 Cargando carpeta Drive: " + folderId + " - Elementos: " + result.getFiles().size());
+                Log.d(TAG, "Cargando carpeta Drive: " + folderId + " - Elementos: " + result.getFiles().size());
 
                 for (File f : result.getFiles()) {
                     boolean esCarpeta = "application/vnd.google-apps.folder".equals(f.getMimeType());
                     String nuevaRuta = ruta.isEmpty() ? f.getName() : ruta + "/" + f.getName();
 
                     if (esCarpeta) {
-                        Log.d(TAG, "📁 Carpeta encontrada: " + f.getName());
+                        Log.d(TAG, "Carpeta encontrada: " + f.getName());
                         acumulador.addAll(cargarTodoDriveRecursivo(f.getId(), nuevaRuta));
                     } else {
                         String nombreArchivo = f.getName();
@@ -91,12 +91,12 @@ public class DriveRepository {
                         item.descargado = descargado;
                         acumulador.add(item);
 
-                        Log.d(TAG, "✅ Archivo Drive agregado al cache: " + item.nombre + " - Ruta: " + ruta);
+                        Log.d(TAG, "Archivo Drive agregado al cache: " + item.nombre + " - Ruta: " + ruta);
                     }
                 }
             }
         } catch (Exception e) {
-            Log.e(TAG, "❌ Error en carga recursiva de Drive: " + e.getMessage());
+            Log.e(TAG, "Error en carga recursiva de Drive: " + e.getMessage());
         }
         return acumulador;
     }
