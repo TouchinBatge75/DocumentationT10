@@ -35,6 +35,11 @@
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize"
             android:launchMode="singleTop"/>
 
+        <activity
+            android:name=".activities.VisorMultimediaActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Documentation" />
+
         <activity android:name=".activities.VisorManualActivity" />
 
         <!-- Metadatos para autenticación de Google -->

@@ -29,7 +29,7 @@ public class DriveRepository {
         try {
             FileList result = driveService.files().list()
                     .setQ("'" + folderId + "' in parents and trashed=false")
-                    .setFields("files(id, name, mimeType)")
+                    .setFields("files(id, name, mimeType, fileExtension)")
                     .execute();
 
             if (result.getFiles() != null) {
@@ -37,20 +37,22 @@ public class DriveRepository {
                     boolean esCarpeta = "application/vnd.google-apps.folder".equals(f.getMimeType());
                     boolean descargado = false;
                     String nombreArchivo = f.getName();
+                    String mimeType = f.getMimeType();
 
                     if (!esCarpeta) {
-                        if (!nombreArchivo.toLowerCase().endsWith(".pdf")) {
-                            nombreArchivo += ".pdf";
-                        }
+                        // NUEVO: Verificar si el archivo existe localmente con su nombre real
                         java.io.File archivoLocal = new java.io.File(context.getFilesDir(),
                                 "Manuales/" + (rutaRelativa.isEmpty() ? "" : rutaRelativa + "/") + nombreArchivo);
                         descargado = archivoLocal.exists();
                     }
 
-                    String nombreMostrar = esCarpeta ? nombreArchivo : nombreArchivo.replace(".pdf", "");
-                    Manual item = new Manual(f.getId(), nombreMostrar, esCarpeta, "", rutaRelativa);
+                    // NUEVO: Usar el nombre real del archivo, no forzar .pdf
+                    String nombreMostrar = nombreArchivo;
+                    Manual item = new Manual(f.getId(), nombreMostrar, esCarpeta, mimeType, rutaRelativa);
                     item.descargado = descargado;
                     itemsDrive.add(item);
+
+                    Log.d(TAG, "Archivo listado: " + nombreArchivo + " - Tipo: " + mimeType + " - Carpeta: " + esCarpeta);
                 }
             }
         } catch (Exception e) {
@@ -66,7 +68,7 @@ public class DriveRepository {
         try {
             FileList result = driveService.files().list()
                     .setQ("'" + folderId + "' in parents and trashed=false")
-                    .setFields("files(id, name, mimeType)")
+                    .setFields("files(id, name, mimeType, fileExtension)")
                     .execute();
 
             if (result.getFiles() != null) {
@@ -81,17 +83,20 @@ public class DriveRepository {
                         acumulador.addAll(cargarTodoDriveRecursivo(f.getId(), nuevaRuta));
                     } else {
                         String nombreArchivo = f.getName();
-                        if (!nombreArchivo.toLowerCase().endsWith(".pdf")) {
-                            nombreArchivo += ".pdf";
-                        }
-                        java.io.File archivoLocal = new java.io.File(context.getFilesDir(), "Manuales/" + nuevaRuta);
+                        String mimeType = f.getMimeType();
+
+                        // CORRECCIÓN: Construir la ruta correcta para verificar existencia local
+                        String rutaLocal = "Manuales/" + (ruta.isEmpty() ? "" : ruta + "/") + nombreArchivo;
+                        java.io.File archivoLocal = new java.io.File(context.getFilesDir(), rutaLocal);
                         boolean descargado = archivoLocal.exists();
 
-                        Manual item = new Manual(f.getId(), nombreArchivo.replace(".pdf", ""), false, "", ruta);
+                        Manual item = new Manual(f.getId(), nombreArchivo, false, mimeType, ruta);
                         item.descargado = descargado;
                         acumulador.add(item);
 
-                        Log.d(TAG, "Archivo Drive agregado al cache: " + item.nombre + " - Ruta: " + ruta);
+                        Log.d(TAG, "Archivo Drive agregado al cache: " + item.nombre +
+                                " - Tipo: " + mimeType + " - Ruta: " + ruta +
+                                " - Descargado: " + descargado);
                     }
                 }
             }
@@ -111,19 +116,23 @@ public class DriveRepository {
                 carpetaDestino.mkdirs();
             }
 
-            java.io.File archivoLocal = new java.io.File(carpetaDestino, item.nombre + ".pdf");
+            // NUEVO: Usar el nombre real del archivo, no forzar .pdf
+            java.io.File archivoLocal = new java.io.File(carpetaDestino, item.nombre);
             FileOutputStream output = new FileOutputStream(archivoLocal);
 
             driveService.files().get(item.idDrive).executeMediaAndDownloadTo(output);
             output.close();
+
+            Log.d(TAG, "Archivo descargado exitosamente: " + item.nombre + " - Ruta: " + archivoLocal.getAbsolutePath());
             return true;
 
         } catch (Exception e) {
-            Log.e(TAG, "Error al descargar archivo: " + e.getMessage());
+            Log.e(TAG, "Error al descargar archivo " + item.nombre + ": " + e.getMessage());
             return false;
         }
     }
 
+    // Los demás métodos (obtenerCarpetasNivel1, obtenerCarpetasNivel2, etc.) se mantienen igual
     public List<String> obtenerCarpetasNivel1(String folderID) {
         List<String> carpetasNivel1 = new ArrayList<>();
         if (driveService == null) return carpetasNivel1;
