@@ -118,4 +118,100 @@ public class LocalFilesRepository {
         }
         return archivo.delete();
     }
+
+    public List<String> obtenerTiposLocales() {
+        List<String> tipos = new ArrayList<>();
+        File carpetaRaiz = new File(context.getFilesDir(), "Manuales");
+
+        if (carpetaRaiz.exists() && carpetaRaiz.isDirectory()) {
+            File[] archivos = carpetaRaiz.listFiles();
+            if (archivos != null) {
+                for (File archivo : archivos) {
+                    if (archivo.isDirectory()) {
+                        tipos.add(archivo.getName());
+                    }
+                }
+            }
+        }
+        return tipos;
+    }
+
+    public List<String> obtenerMarcasLocales(String tipo) {
+        List<String> marcas = new ArrayList<>();
+        File carpetaTipo = new File(context.getFilesDir(), "Manuales/" + tipo);
+
+        if (carpetaTipo.exists() && carpetaTipo.isDirectory()) {
+            File[] archivos = carpetaTipo.listFiles();
+            if (archivos != null) {
+                for (File archivo : archivos) {
+                    if (archivo.isDirectory()) {
+                        marcas.add(archivo.getName());
+                    }
+                }
+            }
+        }
+        return marcas;
+    }
+
+    public List<String> obtenerModelosLocales(String tipo, String marca) {
+        List<String> modelos = new ArrayList<>();
+        File carpetaMarca = new File(context.getFilesDir(), "Manuales/" + tipo + "/" + marca);
+
+        if (carpetaMarca.exists() && carpetaMarca.isDirectory()) {
+            File[] archivos = carpetaMarca.listFiles();
+            if (archivos != null) {
+                for (File archivo : archivos) {
+                    if (archivo.isDirectory()) {
+                        modelos.add(archivo.getName());
+                    }
+                }
+            }
+        }
+        return modelos;
+    }
+
+    public List<Manual> buscarPorCategoriasLocales(String tipo, String marca, String modelo) {
+        List<Manual> resultados = new ArrayList<>();
+
+        // Construir ruta base
+        String rutaBase = "Manuales/";
+        if (!tipo.isEmpty()) rutaBase += tipo + "/";
+        if (!marca.isEmpty()) rutaBase += marca + "/";
+        if (!modelo.isEmpty()) rutaBase += modelo + "/";
+
+        File carpetaBusqueda = new File(context.getFilesDir(), rutaBase);
+
+        if (carpetaBusqueda.exists()) {
+            // Buscar PDFs en esta carpeta
+            buscarPDFsEnCarpeta(carpetaBusqueda, tipo, marca, modelo, resultados);
+        }
+
+        return resultados;
+    }
+
+    private void buscarPDFsEnCarpeta(File carpeta, String tipo, String marca, String modelo, List<Manual> resultados) {
+        if (carpeta.exists() && carpeta.isDirectory()) {
+            File[] archivos = carpeta.listFiles();
+            if (archivos != null) {
+                for (File archivo : archivos) {
+                    if (archivo.isFile() && archivo.getName().toLowerCase().endsWith(".pdf")) {
+                        String nombreSinExtension = archivo.getName().replace(".pdf", "");
+
+                        // Construir ruta relativa
+                        String rutaRelativa = tipo;
+                        if (!marca.isEmpty()) rutaRelativa += "/" + marca;
+                        if (!modelo.isEmpty()) rutaRelativa += "/" + modelo;
+
+                        Manual manual = new Manual("", nombreSinExtension, false, "application/pdf", rutaRelativa);
+                        manual.descargado = true;
+                        manual.rutaCompleta = archivo.getAbsolutePath();
+                        resultados.add(manual);
+                    } else if (archivo.isDirectory()) {
+                        // Buscar recursivamente
+                        buscarPDFsEnCarpeta(archivo, tipo, marca, modelo, resultados);
+                    }
+                }
+            }
+        }
+    }
 }

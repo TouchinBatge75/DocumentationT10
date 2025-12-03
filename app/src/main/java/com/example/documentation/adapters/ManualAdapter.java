@@ -291,34 +291,58 @@ public class ManualAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>
 
         private File obtenerArchivoLocal(Manual item) {
             try {
-                // Construir la ruta completa usando el nombre real del archivo
+                // Verificar si el nombre ya tiene extensión
+                String nombreArchivo = item.nombre;
+                if (!nombreArchivo.toLowerCase().endsWith(".pdf")) {
+                    nombreArchivo += ".pdf";
+                }
+
                 File directorioBase = mainActivity.getFilesDir();
                 String rutaCompleta = "Manuales/" +
                         (item.rutaRelativa.isEmpty() ? "" : item.rutaRelativa + "/") +
-                        item.nombre; // Usar el nombre real, NO forzar .pdf
+                        nombreArchivo;
 
                 File archivoLocal = new File(directorioBase, rutaCompleta);
 
-                Log.d(TAG, "Buscando archivo local: " + archivoLocal.getAbsolutePath());
-                Log.d(TAG, "¿Existe el archivo? " + archivoLocal.exists());
-
-                if (archivoLocal.exists()) {
-                    Log.d(TAG, "Tamaño del archivo: " + archivoLocal.length() + " bytes");
+                // Si no existe con .pdf, probar sin extensión
+                if (!archivoLocal.exists()) {
+                    File archivoSinExtension = new File(directorioBase,
+                            "Manuales/" + (item.rutaRelativa.isEmpty() ? "" : item.rutaRelativa + "/") + item.nombre);
+                    if (archivoSinExtension.exists()) {
+                        return archivoSinExtension;
+                    }
                 }
 
                 return archivoLocal;
 
             } catch (Exception e) {
                 Log.e(TAG, "Error al obtener archivo local: " + e.getMessage());
-                return new File(item.nombre); // Fallback
+                return new File(item.nombre);
             }
         }
 
         private void abrirPdf(Manual item) {
-            Intent intent = new Intent(mainActivity, VisorManualActivity.class);
-            intent.putExtra("archivo_path", item.rutaCompleta);
-            mainActivity.startActivity(intent);
+            File archivo = obtenerArchivoLocal(item);
+
+            if (archivo.exists()) {
+                Log.d(TAG, "✅ Archivo confirmado: " + archivo.getAbsolutePath());
+                Log.d(TAG, "✅ Tamaño: " + archivo.length() + " bytes");
+
+                Intent intent = new Intent(mainActivity, VisorManualActivity.class);
+                intent.putExtra(VisorManualActivity.EXTRA_MANUAL_PATH, archivo.getAbsolutePath());
+
+                // Depuración: verificar extra
+                Log.d(TAG, "✅ Pasando extra: " + VisorManualActivity.EXTRA_MANUAL_PATH +
+                        " = " + archivo.getAbsolutePath());
+
+                mainActivity.startActivity(intent);
+            } else {
+                Log.e(TAG, "❌ Archivo no existe para abrir: " + archivo.getAbsolutePath());
+                Toast.makeText(mainActivity, "El archivo no existe: " + archivo.getName(), Toast.LENGTH_SHORT).show();
+            }
         }
+
+
 
         private void abrirConVisorMultimedia(Manual item) {
             Intent intent = new Intent(mainActivity, VisorMultimediaActivity.class);

@@ -39,20 +39,34 @@ public class DriveRepository {
                     String nombreArchivo = f.getName();
                     String mimeType = f.getMimeType();
 
-                    if (!esCarpeta) {
-                        // NUEVO: Verificar si el archivo existe localmente con su nombre real
-                        java.io.File archivoLocal = new java.io.File(context.getFilesDir(),
-                                "Manuales/" + (rutaRelativa.isEmpty() ? "" : rutaRelativa + "/") + nombreArchivo);
-                        descargado = archivoLocal.exists();
+                    // CORRECCIÓN: Si es PDF, asegurar nombre correcto para búsqueda local
+                    String nombreParaBusqueda = nombreArchivo;
+                    String nombreParaMostrar = nombreArchivo;
+
+                    // Si es PDF pero no tiene extensión .pdf, preparar para búsqueda
+                    if (!esCarpeta && mimeType.equals("application/pdf")) {
+                        if (!nombreArchivo.toLowerCase().endsWith(".pdf")) {
+                            nombreParaBusqueda = nombreArchivo + ".pdf";
+                            Log.d(TAG, "PDF sin extensión, buscaremos como: " + nombreParaBusqueda);
+                        }
                     }
 
-                    // NUEVO: Usar el nombre real del archivo, no forzar .pdf
-                    String nombreMostrar = nombreArchivo;
-                    Manual item = new Manual(f.getId(), nombreMostrar, esCarpeta, mimeType, rutaRelativa);
+                    if (!esCarpeta) {
+                        // Buscar con el nombre corregido
+                        java.io.File archivoLocal = new java.io.File(context.getFilesDir(),
+                                "Manuales/" + (rutaRelativa.isEmpty() ? "" : rutaRelativa + "/") + nombreParaBusqueda);
+                        descargado = archivoLocal.exists();
+
+                        Log.d(TAG, "Verificando existencia: " + archivoLocal.getAbsolutePath() +
+                                " - ¿Existe?: " + descargado);
+                    }
+
+                    Manual item = new Manual(f.getId(), nombreParaMostrar, esCarpeta, mimeType, rutaRelativa);
                     item.descargado = descargado;
                     itemsDrive.add(item);
 
-                    Log.d(TAG, "Archivo listado: " + nombreArchivo + " - Tipo: " + mimeType + " - Carpeta: " + esCarpeta);
+                    Log.d(TAG, "Archivo listado: " + nombreArchivo + " - Tipo: " + mimeType +
+                            " - Descargado: " + descargado);
                 }
             }
         } catch (Exception e) {
@@ -112,22 +126,56 @@ public class DriveRepository {
         try {
             java.io.File carpetaDestino = new java.io.File(context.getFilesDir(),
                     "Manuales/" + (item.rutaRelativa.isEmpty() ? "" : item.rutaRelativa));
+
+            Log.d(TAG, "=== INICIANDO DESCARGA ===");
+            Log.d(TAG, "Carpeta destino: " + carpetaDestino.getAbsolutePath());
+            Log.d(TAG, "Nombre original: " + item.nombre);
+            Log.d(TAG, "Tipo archivo: " + item.tipoArchivo);
+
             if (!carpetaDestino.exists()) {
-                carpetaDestino.mkdirs();
+                boolean creado = carpetaDestino.mkdirs();
+                Log.d(TAG, "Carpeta creada: " + creado);
             }
 
-            // NUEVO: Usar el nombre real del archivo, no forzar .pdf
-            java.io.File archivoLocal = new java.io.File(carpetaDestino, item.nombre);
+            // CORRECCIÓN: Detectar si es PDF y asegurar extensión .pdf
+            String nombreArchivoFinal;
+
+            if (item.tipoArchivo != null && item.tipoArchivo.equals("pdf")) {
+                // Si ya termina en .pdf, dejarlo como está
+                if (item.nombre.toLowerCase().endsWith(".pdf")) {
+                    nombreArchivoFinal = item.nombre;
+                    Log.d(TAG, "Nombre ya tiene .pdf: " + nombreArchivoFinal);
+                } else {
+                    // Agregar .pdf si no lo tiene
+                    nombreArchivoFinal = item.nombre + ".pdf";
+                    Log.d(TAG, "Agregando .pdf: " + nombreArchivoFinal);
+                }
+            } else {
+                // Para otros tipos, usar nombre original
+                nombreArchivoFinal = item.nombre;
+                Log.d(TAG, "No es PDF, usando nombre original: " + nombreArchivoFinal);
+            }
+
+            java.io.File archivoLocal = new java.io.File(carpetaDestino, nombreArchivoFinal);
+            Log.d(TAG, "Ruta final del archivo: " + archivoLocal.getAbsolutePath());
+
             FileOutputStream output = new FileOutputStream(archivoLocal);
 
             driveService.files().get(item.idDrive).executeMediaAndDownloadTo(output);
             output.close();
 
-            Log.d(TAG, "Archivo descargado exitosamente: " + item.nombre + " - Ruta: " + archivoLocal.getAbsolutePath());
-            return true;
+            // Verificar que el archivo se descargó correctamente
+            if (archivoLocal.exists() && archivoLocal.length() > 0) {
+                Log.d(TAG, "✅ Descarga exitosa - Tamaño: " + archivoLocal.length() + " bytes");
+                return true;
+            } else {
+                Log.e(TAG, "❌ Error: Archivo descargado pero vacío o no existe");
+                return false;
+            }
 
         } catch (Exception e) {
-            Log.e(TAG, "Error al descargar archivo " + item.nombre + ": " + e.getMessage());
+            Log.e(TAG, "❌ Error al descargar archivo " + item.nombre + ": " + e.getMessage());
+            e.printStackTrace();
             return false;
         }
     }

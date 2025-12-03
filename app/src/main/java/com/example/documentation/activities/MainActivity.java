@@ -22,6 +22,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.documentation.R;
 import com.example.documentation.adapters.ManualAdapter;
 import com.example.documentation.models.Manual;
+import com.example.documentation.repositories.BusquedaCategoriasHelper;
 import com.example.documentation.repositories.DriveRepository;
 import com.example.documentation.repositories.LocalFilesRepository;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
@@ -222,48 +223,65 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void buscarPorSelectores() {
-        if (currentAccount == null || driveRepository == null) {
-            Toast.makeText(this, "Primero conéctate a Google Drive", Toast.LENGTH_SHORT).show();
-            iniciarAutenticacionGoogle();
+        // Verificar si tenemos Drive disponible
+        boolean tieneDrive = (currentAccount != null && driveRepository != null);
+
+        // Crear helper con ambas fuentes
+        BusquedaCategoriasHelper helper = new BusquedaCategoriasHelper(
+                driveRepository,
+                localFilesRepository,
+                tieneDrive
+        );
+
+        // Obtener tipos combinados
+        List<String> tipos = helper.obtenerTipos(folderID);
+
+        if (tipos.isEmpty()) {
+            Toast.makeText(this, "No hay categorías disponibles", Toast.LENGTH_SHORT).show();
             return;
         }
-        obtenerCarpetasNivel1();
+
+        mostrarSelectorNivel1(tipos, helper);
     }
 
-    private void obtenerCarpetasNivel1() {
-        new Thread(() -> {
-            List<String> carpetasNivel1 = driveRepository.obtenerCarpetasNivel1(folderID);
-
-            runOnUiThread(() -> {
-                if (carpetasNivel1.isEmpty()) {
-                    Toast.makeText(this, "Error al cargar carpetas", Toast.LENGTH_SHORT).show();
-                } else {
-                    mostrarSelectorNivel1(carpetasNivel1);
-                }
-            });
-        }).start();
-    }
-
-    private void mostrarSelectorNivel1(List<String> tipos) {
+    private void mostrarSelectorNivel1(List<String> tipos, BusquedaCategoriasHelper helper) {
         View dialogView = getLayoutInflater().inflate(R.layout.dialog_selectores, null);
         Spinner spinnerTipo = dialogView.findViewById(R.id.spinner_tipo);
         Spinner spinnerMarca = dialogView.findViewById(R.id.spinner_marca);
         Spinner spinnerModelo = dialogView.findViewById(R.id.spinner_modelo);
 
+        // Agregar opción vacía
+        List<String> tiposConVacio = new ArrayList<>();
+        tiposConVacio.add("-- Selecciona un tipo --");
+        tiposConVacio.addAll(tipos);
+
         ArrayAdapter<String> adapterTipo = new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_dropdown_item, tipos);
+                android.R.layout.simple_spinner_dropdown_item, tiposConVacio);
         spinnerTipo.setAdapter(adapterTipo);
 
+        // Configurar spinners vacíos
+        ArrayAdapter<String> adapterVacio = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item,
+                new ArrayList<>());
+
+        spinnerMarca.setAdapter(adapterVacio);
+        spinnerModelo.setAdapter(adapterVacio);
         spinnerMarca.setEnabled(false);
         spinnerModelo.setEnabled(false);
-        spinnerMarca.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, new ArrayList<>()));
-        spinnerModelo.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, new ArrayList<>()));
 
         spinnerTipo.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                String tipoSeleccionado = parent.getItemAtPosition(position).toString();
-                obtenerCarpetasNivel2(tipoSeleccionado, spinnerMarca, spinnerModelo);
+                if (position > 0) { // No es la opción vacía
+                    String tipoSeleccionado = parent.getItemAtPosition(position).toString();
+                    obtenerCarpetasNivel2(tipoSeleccionado, spinnerMarca, spinnerModelo, helper);
+                } else {
+                    // Limpiar los otros spinners
+                    spinnerMarca.setAdapter(adapterVacio);
+                    spinnerModelo.setAdapter(adapterVacio);
+                    spinnerMarca.setEnabled(false);
+                    spinnerModelo.setEnabled(false);
+                }
             }
 
             @Override
@@ -274,25 +292,36 @@ public class MainActivity extends AppCompatActivity {
         builder.setTitle("Buscar por categorías");
         builder.setView(dialogView);
         builder.setPositiveButton("Buscar", (d, w) -> {
-            String tipo = spinnerTipo.getSelectedItem() != null ? spinnerTipo.getSelectedItem().toString() : "";
-            String marca = spinnerMarca.getSelectedItem() != null ? spinnerMarca.getSelectedItem().toString() : "";
-            String modelo = spinnerModelo.getSelectedItem() != null ? spinnerModelo.getSelectedItem().toString() : "";
-            ejecutarBusquedaPorCarpetas(tipo, marca, modelo);
+            String tipo = spinnerTipo.getSelectedItem() != null && spinnerTipo.getSelectedItemPosition() > 0
+                    ? spinnerTipo.getSelectedItem().toString() : "";
+            String marca = spinnerMarca.getSelectedItem() != null && spinnerMarca.isEnabled()
+                    ? spinnerMarca.getSelectedItem().toString() : "";
+            String modelo = spinnerModelo.getSelectedItem() != null && spinnerModelo.isEnabled()
+                    ? spinnerModelo.getSelectedItem().toString() : "";
+
+            if (!tipo.isEmpty()) {
+                ejecutarBusquedaPorCategorias(tipo, marca, modelo, helper);
+            } else {
+                Toast.makeText(this, "Selecciona al menos un tipo", Toast.LENGTH_SHORT).show();
+            }
         });
         builder.setNegativeButton("Cancelar", (d, w) -> d.dismiss());
-        builder.show();
+
+        AlertDialog dialog = builder.create();
+        dialog.show();
     }
 
-    private void obtenerCarpetasNivel2(String tipoSeleccionado, Spinner spinnerMarca, Spinner spinnerModelo) {
+    private void obtenerCarpetasNivel2(String tipoSeleccionado, Spinner spinnerMarca, Spinner spinnerModelo, BusquedaCategoriasHelper helper) {
         new Thread(() -> {
-            List<String> marcas = driveRepository.obtenerCarpetasNivel2(folderID, tipoSeleccionado);
+            List<String> marcas = helper.obtenerMarcas(folderID, tipoSeleccionado);
 
             runOnUiThread(() -> {
                 ArrayAdapter<String> adapterMarca = new ArrayAdapter<>(MainActivity.this,
                         android.R.layout.simple_spinner_dropdown_item, marcas);
                 spinnerMarca.setAdapter(adapterMarca);
-                spinnerMarca.setEnabled(true);
+                spinnerMarca.setEnabled(!marcas.isEmpty());
 
+                // Limpiar modelo
                 spinnerModelo.setAdapter(new ArrayAdapter<>(MainActivity.this,
                         android.R.layout.simple_spinner_dropdown_item, new ArrayList<>()));
                 spinnerModelo.setEnabled(false);
@@ -300,8 +329,10 @@ public class MainActivity extends AppCompatActivity {
                 spinnerMarca.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                     @Override
                     public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                        String marcaSeleccionada = parent.getItemAtPosition(position).toString();
-                        obtenerCarpetasNivel3(tipoSeleccionado, marcaSeleccionada, spinnerModelo);
+                        if (position >= 0 && position < marcas.size()) {
+                            String marcaSeleccionada = parent.getItemAtPosition(position).toString();
+                            obtenerCarpetasNivel3(tipoSeleccionado, marcaSeleccionada, spinnerModelo, helper);
+                        }
                     }
 
                     @Override
@@ -311,23 +342,15 @@ public class MainActivity extends AppCompatActivity {
         }).start();
     }
 
-    private void obtenerCarpetasNivel3(String tipoSeleccionado, String marcaSeleccionada, Spinner spinnerModelo) {
+    private void obtenerCarpetasNivel3(String tipoSeleccionado, String marcaSeleccionada, Spinner spinnerModelo, BusquedaCategoriasHelper helper) {
         new Thread(() -> {
-            // Primero necesitamos obtener el ID del tipo
-            String idTipo = obtenerIdCarpeta(folderID, tipoSeleccionado);
-            if (idTipo == null) return;
-
-            List<String> modelos = driveRepository.obtenerCarpetasNivel3(idTipo, marcaSeleccionada);
+            List<String> modelos = helper.obtenerModelos(folderID, tipoSeleccionado, marcaSeleccionada);
 
             runOnUiThread(() -> {
-                if (!modelos.isEmpty()) {
-                    ArrayAdapter<String> adapterModelo = new ArrayAdapter<>(MainActivity.this,
-                            android.R.layout.simple_spinner_dropdown_item, modelos);
-                    spinnerModelo.setAdapter(adapterModelo);
-                    spinnerModelo.setEnabled(true);
-                } else {
-                    spinnerModelo.setEnabled(false);
-                }
+                ArrayAdapter<String> adapterModelo = new ArrayAdapter<>(MainActivity.this,
+                        android.R.layout.simple_spinner_dropdown_item, modelos);
+                spinnerModelo.setAdapter(adapterModelo);
+                spinnerModelo.setEnabled(!modelos.isEmpty());
             });
         }).start();
     }
@@ -347,19 +370,35 @@ public class MainActivity extends AppCompatActivity {
         return null;
     }
 
-    private void ejecutarBusquedaPorCarpetas(String tipo, String marca, String modelo) {
-        if (tipo.isEmpty()) {
-            Toast.makeText(this, "Selecciona al menos un tipo", Toast.LENGTH_SHORT).show();
-            return;
-        }
+    private void ejecutarBusquedaPorCategorias(String tipo, String marca, String modelo, BusquedaCategoriasHelper helper) {
+        Log.d(TAG, "=== BUSQUEDA POR CATEGORIAS ===");
+        Log.d(TAG, "Tipo: " + tipo + ", Marca: " + marca + ", Modelo: " + modelo);
+
+        // Mostrar progreso
+        Toast.makeText(this, "Buscando manuales...", Toast.LENGTH_SHORT).show();
 
         new Thread(() -> {
-            String folderIdDestino = driveRepository.navegarACarpeta(folderID, tipo, marca, modelo);
-            final String rutaFinal = tipo + (marca.isEmpty() ? "" : "/" + marca) + (modelo.isEmpty() ? "" : "/" + modelo);
+            List<Manual> resultados = helper.buscarPorCategorias(folderID, tipo, marca, modelo);
 
             runOnUiThread(() -> {
-                abrirCarpeta(folderIdDestino, rutaFinal);
-                Toast.makeText(MainActivity.this, "Navegando a: " + rutaFinal, Toast.LENGTH_SHORT).show();
+                if (resultados.isEmpty()) {
+                    Toast.makeText(this, "No se encontraron manuales en esta categoría", Toast.LENGTH_SHORT).show();
+                } else {
+                    // Actualizar la lista
+                    items.clear();
+                    items.addAll(resultados);
+                    adapter.updateData(resultados);
+
+                    // Mostrar mensaje
+                    int totalArchivos = 0;
+                    for (Manual m : resultados) {
+                        if (!m.esHeaderSeccion) totalArchivos++;
+                    }
+                    Toast.makeText(this, "Encontrados: " + totalArchivos + " manuales", Toast.LENGTH_SHORT).show();
+
+                    // Actualizar botón de inicio
+                    actualizarBotonInicio();
+                }
             });
         }).start();
     }

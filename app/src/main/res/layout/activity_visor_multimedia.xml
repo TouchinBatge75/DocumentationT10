@@ -4,12 +4,13 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@android:color/white">
+    android:background="@android:color/black">
 
     <!-- Header -->
     <RelativeLayout
+        android:id="@+id/headerLayout"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="109dp"
         android:background="#673AB7"
         android:paddingStart="16dp"
         android:paddingEnd="16dp">
@@ -22,6 +23,7 @@
             android:background="?android:attr/selectableItemBackgroundBorderless"
             android:src="@android:drawable/ic_menu_close_clear_cancel"
             app:tint="#FFFFFF" />
+
         <TextView
             android:id="@+id/tvTitulo"
             android:layout_width="wrap_content"
@@ -36,112 +38,108 @@
 
     </RelativeLayout>
 
-    <!-- Contenedor principal -->
-    <ScrollView
+    <!-- CONTENEDOR DINÁMICO - Aquí se mostrará el contenido según el tipo -->
+    <FrameLayout
+        android:id="@+id/container"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1">
 
-        <LinearLayout
+        <!-- VIDEO - Pantalla completa -->
+        <RelativeLayout
+            android:id="@+id/layoutVideo"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:layout_height="match_parent"
+            android:background="@android:color/black"
+            android:visibility="gone">
 
-            <!-- Layout para Video -->
+            <VideoView
+                android:id="@+id/videoView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+        </RelativeLayout>
+
+        <!-- IMAGEN - Con ScrollView -->
+        <ScrollView
+            android:id="@+id/layoutImagen"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@android:color/white"
+            android:visibility="gone">
+
             <LinearLayout
-                android:id="@+id/layoutVideo"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:visibility="gone">
-
-                <VideoView
-                    android:id="@+id/videoView"
-                    android:layout_width="match_parent"
-                    android:layout_height="300dp"
-                    android:layout_gravity="center" />
-
-            </LinearLayout>
-
-            <!-- Layout para Imagen -->
-            <LinearLayout
-                android:id="@+id/layoutImagen"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:visibility="gone">
+                android:orientation="vertical">
 
                 <ImageView
                     android:id="@+id/imageView"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="center"
                     android:adjustViewBounds="true"
                     android:scaleType="fitCenter" />
 
             </LinearLayout>
+        </ScrollView>
 
-            <!-- Layout para Texto -->
-            <LinearLayout
-                android:id="@+id/layoutTexto"
+        <!-- TEXTO - Con ScrollView -->
+        <ScrollView
+            android:id="@+id/layoutTexto"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@android:color/white"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/textView"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:visibility="gone"
-                android:padding="16dp">
+                android:lineSpacingExtra="4dp"
+                android:padding="16dp"
+                android:textColor="#000000"
+                android:textIsSelectable="true"
+                android:textSize="14sp" />
 
-                <TextView
-                    android:id="@+id/textView"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="@android:color/white"
-                    android:lineSpacingExtra="4dp"
-                    android:padding="16dp"
-                    android:scrollbars="vertical"
-                    android:textColor="#000000"
-                    android:textIsSelectable="true"
-                    android:textSize="14sp" />
+        </ScrollView>
 
-            </LinearLayout>
+        <!-- NO SOPORTADO -->
+        <LinearLayout
+            android:id="@+id/layoutNoSoportado"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@android:color/white"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:visibility="gone">
 
-            <!-- Layout para archivos no soportados -->
-            <LinearLayout
-                android:id="@+id/layoutNoSoportado"
-                android:layout_width="match_parent"
-                android:layout_height="300dp"
-                android:orientation="vertical"
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📎"
+                android:textSize="48sp" />
+
+            <TextView
+                android:id="@+id/tvTipoNoSoportado"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
                 android:gravity="center"
-                android:visibility="gone">
+                android:text="Tipo de archivo no soportado"
+                android:textColor="#000000"
+                android:textSize="16sp" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="📎"
-                    android:textSize="48sp" />
-
-                <TextView
-                    android:id="@+id/tvTipoNoSoportado"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:gravity="center"
-                    android:text="Tipo de archivo no soportado"
-                    android:textColor="#000000"
-                    android:textSize="16sp" />
-
-                <Button
-                    android:id="@+id/btnAbrirExterno"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:text="Abrir con otra app"
-                    android:backgroundTint="#673AB7"
-                    android:textColor="#FFFFFF" />
-
-            </LinearLayout>
+            <Button
+                android:id="@+id/btnAbrirExterno"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:backgroundTint="#673AB7"
+                android:text="Abrir con otra app"
+                android:textColor="#FFFFFF" />
 
         </LinearLayout>
 
-    </ScrollView>
+    </FrameLayout>
 
 </LinearLayout>
