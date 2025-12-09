@@ -20,6 +20,7 @@ import com.example.documentation.activities.VisorManualActivity;
 import com.example.documentation.activities.VisorMultimediaActivity;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 
 public class ManualAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
@@ -187,11 +188,24 @@ public class ManualAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>
             progressCircular.setVisibility(View.VISIBLE);
 
             new Thread(() -> {
+                // ❌ FALTA: Guardar la ruta original antes de modificar
+                String nombreOriginal = item.nombre;
+                String rutaRelativaOriginal = item.rutaRelativa;
+
                 boolean exito = mainActivity.getDriveRepository().descargarArchivo(item);
 
                 mainActivity.runOnUiThread(() -> {
                     if (exito) {
+                        // ✅ Asegurar que el item tenga los datos correctos
                         item.descargado = true;
+
+                        // ✅ Obtener la ruta real después de descargar
+                        File archivoLocal = obtenerArchivoLocal(item);
+                        if (archivoLocal.exists()) {
+                            item.rutaCompleta = archivoLocal.getAbsolutePath();
+                            Log.d(TAG, "✅ Ruta actualizada después de descargar: " + item.rutaCompleta);
+                        }
+
                         progressCircular.setVisibility(View.GONE);
                         btnAccion.setVisibility(View.VISIBLE);
                         btnAccion.setText("Abrir");
@@ -201,9 +215,12 @@ public class ManualAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>
                         mainActivity.actualizarItemDescargado(item, position);
                         Toast.makeText(mainActivity, "Descargado: " + item.nombre, Toast.LENGTH_SHORT).show();
 
-                        // Abrir automáticamente después de descargar
-                        abrirArchivo(item);
+
                     } else {
+                        // ❌ Restaurar nombre original si falló
+                        item.nombre = nombreOriginal;
+                        item.rutaRelativa = rutaRelativaOriginal;
+
                         progressCircular.setVisibility(View.GONE);
                         btnAccion.setVisibility(View.VISIBLE);
                         btnAccion.setText("Descargar");
@@ -215,7 +232,6 @@ public class ManualAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>
                 });
             }).start();
         }
-
         public void eliminarArchivo(Manual item, int position) {
             boolean eliminado = mainActivity.getLocalFilesRepository().eliminarArchivo(item);
 
@@ -240,23 +256,40 @@ public class ManualAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>
             File archivoLocal = obtenerArchivoLocal(item);
 
             Log.d(TAG, "=== INTENTANDO ABRIR ARCHIVO ===");
-            Log.d(TAG, "Nombre: " + item.nombre);
-            Log.d(TAG, "Tipo detectado: " + item.tipoArchivo);
+            Log.d(TAG, "Nombre original: " + item.nombre);
+            Log.d(TAG, "Nombre limpio: " + item.obtenerNombreLimpio());
+            Log.d(TAG, "Tipo detectado inicial: " + item.tipoArchivo);
             Log.d(TAG, "Ruta local: " + archivoLocal.getAbsolutePath());
             Log.d(TAG, "¿Existe? " + archivoLocal.exists());
 
             if (archivoLocal.exists() && archivoLocal.length() > 0) {
+                // ✅ FORZAR DETECCIÓN CORRECTA BASADA EN EL ARCHIVO REAL
+                String nombreArchivoReal = archivoLocal.getName();
+
+                // Detectar tipo basado en el nombre REAL del archivo
+                String tipoReal = "desconocido";
+                if (nombreArchivoReal.toLowerCase().endsWith(".pdf")) {
+                    tipoReal = "pdf";
+                } else if (nombreArchivoReal.toLowerCase().matches(".*\\.(mp4|avi|mkv|mov|wmv)$")) {
+                    tipoReal = "video";
+                } else if (nombreArchivoReal.toLowerCase().matches(".*\\.(jpg|jpeg|png|gif|bmp|webp)$")) {
+                    tipoReal = "imagen";
+                }
+
+                Log.d(TAG, "Nombre real del archivo: " + nombreArchivoReal);
+                Log.d(TAG, "Tipo real detectado: " + tipoReal);
+
                 // Configurar la ruta completa y tipo de archivo en el objeto
                 item.rutaCompleta = archivoLocal.getAbsolutePath();
-                item.tipoArchivo = item.detectarTipoArchivo();
+                item.tipoArchivo = tipoReal; // Usar el tipo detectado del archivo real
 
                 Log.d(TAG, "Ruta completa: " + item.rutaCompleta);
-                Log.d(TAG, "Tipo final: " + item.tipoArchivo);
+                Log.d(TAG, "Tipo final asignado: " + item.tipoArchivo);
 
                 // Abrir según el tipo de archivo
                 switch (item.tipoArchivo) {
                     case "pdf":
-                        Log.d(TAG, "Abriendo como PDF...");
+                        Log.d(TAG, "✅ Abriendo como PDF...");
                         abrirPdf(item);
                         break;
                     case "video":
@@ -289,38 +322,93 @@ public class ManualAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>
             }
         }
 
+        // En ManualAdapter.java, agrega este método:
+        private String detectarTipoDesdeNombreArchivo(String nombreArchivo) {
+            if (nombreArchivo == null) return "desconocido";
+
+            nombreArchivo = nombreArchivo.toLowerCase().trim();
+
+            // Limpiar dobles puntos
+            nombreArchivo = nombreArchivo.replace("..pdf", ".pdf");
+
+            if (nombreArchivo.endsWith(".pdf")) {
+                return "pdf";
+            } else if (nombreArchivo.matches(".*\\.(mp4|avi|mkv|mov|wmv)$")) {
+                return "video";
+            } else if (nombreArchivo.matches(".*\\.(jpg|jpeg|png|gif|bmp|webp)$")) {
+                return "imagen";
+            } else if (nombreArchivo.matches(".*\\.(mp3|wav|ogg|m4a)$")) {
+                return "audio";
+            } else if (nombreArchivo.matches(".*\\.(txt|doc|docx)$")) {
+                return "texto";
+            }
+
+            return "desconocido";
+        }
         private File obtenerArchivoLocal(Manual item) {
             try {
-                // Verificar si el nombre ya tiene extensión
-                String nombreArchivo = item.nombre;
-                if (!nombreArchivo.toLowerCase().endsWith(".pdf")) {
-                    nombreArchivo += ".pdf";
+                File directorioBase = mainActivity.getFilesDir();
+                String rutaBase = "Manuales/" +
+                        (item.rutaRelativa.isEmpty() ? "" : item.rutaRelativa + "/");
+
+                Log.d(TAG, "🔍 Buscando archivo en: " + rutaBase);
+
+                // Lista de nombres a probar (en orden de prioridad)
+                List<File> archivosAPrueba = new ArrayList<>();
+
+                // 1. Nombre exacto del item
+                archivosAPrueba.add(new File(directorioBase, rutaBase + item.nombre));
+
+                // 2. Si el item no tiene .pdf pero es tipo PDF
+                if (item.tipoArchivo.equals("pdf") && !item.nombre.toLowerCase().endsWith(".pdf")) {
+                    archivosAPrueba.add(new File(directorioBase, rutaBase + item.nombre + ".pdf"));
                 }
 
-                File directorioBase = mainActivity.getFilesDir();
-                String rutaCompleta = "Manuales/" +
-                        (item.rutaRelativa.isEmpty() ? "" : item.rutaRelativa + "/") +
-                        nombreArchivo;
+                // 3. Si el item tiene .pdf, probar sin extensión
+                if (item.nombre.toLowerCase().endsWith(".pdf")) {
+                    String nombreSinExtension = item.nombre.substring(0, item.nombre.length() - 4);
+                    archivosAPrueba.add(new File(directorioBase, rutaBase + nombreSinExtension));
+                }
 
-                File archivoLocal = new File(directorioBase, rutaCompleta);
-
-                // Si no existe con .pdf, probar sin extensión
-                if (!archivoLocal.exists()) {
-                    File archivoSinExtension = new File(directorioBase,
-                            "Manuales/" + (item.rutaRelativa.isEmpty() ? "" : item.rutaRelativa + "/") + item.nombre);
-                    if (archivoSinExtension.exists()) {
-                        return archivoSinExtension;
+                // 4. Buscar cualquier archivo que coincida (sin importar extensión)
+                File carpeta = new File(directorioBase, rutaBase);
+                if (carpeta.exists() && carpeta.isDirectory()) {
+                    File[] archivosEnCarpeta = carpeta.listFiles();
+                    if (archivosEnCarpeta != null) {
+                        for (File archivo : archivosEnCarpeta) {
+                            if (archivo.isFile()) {
+                                String nombreArchivo = archivo.getName();
+                                String nombreSinExt = nombreArchivo.replace(".pdf", "").replace(".PDF", "");
+                                if (nombreSinExt.equals(item.nombre) ||
+                                        nombreArchivo.equals(item.nombre) ||
+                                        nombreSinExt.equals(item.nombre.replace(".pdf", ""))) {
+                                    archivosAPrueba.add(archivo);
+                                }
+                            }
+                        }
                     }
                 }
 
-                return archivoLocal;
+                // Probar cada posibilidad
+                for (File archivo : archivosAPrueba) {
+                    if (archivo.exists() && archivo.isFile() && archivo.length() > 0) {
+                        Log.d(TAG, "✅ Archivo encontrado: " + archivo.getAbsolutePath());
+                        Log.d(TAG, "✅ Tamaño: " + archivo.length() + " bytes");
+                        return archivo;
+                    }
+                }
+
+                // Si no se encontró, devolver la ruta más probable
+                File rutaMasProbable = new File(directorioBase, rutaBase + item.nombre +
+                        (item.tipoArchivo.equals("pdf") ? ".pdf" : ""));
+                Log.e(TAG, "❌ Archivo no encontrado. Ruta esperada: " + rutaMasProbable.getAbsolutePath());
+                return rutaMasProbable;
 
             } catch (Exception e) {
-                Log.e(TAG, "Error al obtener archivo local: " + e.getMessage());
+                Log.e(TAG, "Error en obtenerArchivoLocal: " + e.getMessage(), e);
                 return new File(item.nombre);
             }
         }
-
         private void abrirPdf(Manual item) {
             File archivo = obtenerArchivoLocal(item);
 

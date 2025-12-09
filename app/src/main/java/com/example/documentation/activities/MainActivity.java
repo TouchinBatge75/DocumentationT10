@@ -39,6 +39,7 @@ import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.DriveScopes;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -544,18 +545,35 @@ public class MainActivity extends AppCompatActivity {
     public void actualizarItemDescargado(Manual itemDescargado, int position) {
         if (position >= 0 && position < items.size()) {
             items.get(position).descargado = true;
+
+            // ✅ Usar LocalFilesRepository para obtener la ruta
+            File archivoLocal = localFilesRepository.obtenerArchivoLocal(items.get(position));
+            if (archivoLocal.exists()) {
+                items.get(position).rutaCompleta = archivoLocal.getAbsolutePath();
+                Log.d(TAG, "✅ Ruta asignada: " + items.get(position).rutaCompleta);
+            }
+
             adapter.notifyItemChanged(position);
         }
 
+        // Actualizar en cache de Drive
         for (Manual item : cacheCompletoDrive) {
-            if (item.idDrive.equals(itemDescargado.idDrive)) {
+            if (item.idDrive != null && item.idDrive.equals(itemDescargado.idDrive)) {
                 item.descargado = true;
+
+                // También actualizar ruta en cache si es posible
+                File archivoLocal = localFilesRepository.obtenerArchivoLocal(item);
+                if (archivoLocal.exists()) {
+                    item.rutaCompleta = archivoLocal.getAbsolutePath();
+                }
                 break;
             }
         }
 
+        // Actualizar en todosLosItems
         for (Manual item : todosLosItems) {
-            if (item.nombre.equals(itemDescargado.nombre) && item.rutaRelativa.equals(itemDescargado.rutaRelativa)) {
+            if (item.nombre.equals(itemDescargado.nombre) &&
+                    item.rutaRelativa.equals(itemDescargado.rutaRelativa)) {
                 item.descargado = true;
                 break;
             }
@@ -563,7 +581,6 @@ public class MainActivity extends AppCompatActivity {
 
         Log.d(TAG, "Item actualizado: " + itemDescargado.nombre + " - Descargado: true");
     }
-
     public void actualizarItemEliminado(Manual itemEliminado, int position) {
         if (position >= 0 && position < items.size()) {
             items.get(position).descargado = false;
@@ -587,31 +604,71 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "Item actualizado: " + itemEliminado.nombre + " - Descargado: false");
     }
 
+    // En MainActivity.java - Método cargarManualesLocales
     private void cargarManualesLocales(String rutaRelativa) {
-        new Thread(() -> {
-            List<Manual> itemsLocales = localFilesRepository.cargarManualesLocales(rutaRelativa);
+        // En MainActivity, "this" es el Context
+        File carpeta = new File(getFilesDir(), "Manuales/" + rutaRelativa);
+        List<Manual> itemsLocales = new ArrayList<>();
 
-            runOnUiThread(() -> {
-                todosLosItems.clear();
-                todosLosItems.addAll(itemsLocales);
+        Log.d(TAG, "=== CARGANDO LOCALES DESDE MAINACTIVITY ===");
+        Log.d(TAG, "Ruta: " + carpeta.getAbsolutePath());
+        Log.d(TAG, "¿Existe?: " + carpeta.exists());
 
-                items.clear();
-                items.addAll(itemsLocales);
-                adapter.updateData(itemsLocales);
-                currentRelativePath = rutaRelativa;
+        if (carpeta.exists()) {
+            File[] archivos = carpeta.listFiles();
+            Log.d(TAG, "Elementos encontrados: " + (archivos != null ? archivos.length : 0));
 
-                if (itemsLocales.isEmpty()) {
-                    Toast.makeText(MainActivity.this, "Carpeta vacía", Toast.LENGTH_SHORT).show();
-                } else {
-                    Toast.makeText(MainActivity.this,
-                            "Cargados: " + itemsLocales.size() + " elementos",
-                            Toast.LENGTH_SHORT).show();
+            if (archivos != null) {
+                // 1. PRIMERO AGREGAR CARPETAS
+                for (File archivo : archivos) {
+                    if (archivo.isDirectory()) {
+                        Manual itemCarpeta = new Manual("", archivo.getName(), true, "", rutaRelativa);
+                        itemsLocales.add(itemCarpeta);
+                        Log.d(TAG, "📁 Carpeta: " + archivo.getName());
+                    }
                 }
-                actualizarBotonInicio();
-            });
-        }).start();
-    }
 
+                // 2. LUEGO AGREGAR TODOS LOS ARCHIVOS
+                for (File archivo : archivos) {
+                    if (archivo.isFile()) {
+                        String nombreArchivo = archivo.getName();
+
+                        Manual item = new Manual("", nombreArchivo, false, "", rutaRelativa);
+                        item.tipoArchivo = item.detectarTipoArchivo();
+                        item.descargado = true;
+                        item.rutaCompleta = archivo.getAbsolutePath();
+
+                        itemsLocales.add(item);
+                        Log.d(TAG, "📄 Archivo: " + nombreArchivo + " - Tipo: " + item.tipoArchivo);
+                    }
+                }
+            }
+        } else {
+            Log.d(TAG, "❌ La carpeta no existe");
+        }
+
+        Log.d(TAG, "=== TOTAL: " + itemsLocales.size() + " elementos ===");
+
+        // Actualizar la UI
+        runOnUiThread(() -> {
+            todosLosItems.clear();
+            todosLosItems.addAll(itemsLocales);
+
+            items.clear();
+            items.addAll(itemsLocales);
+            adapter.updateData(itemsLocales);
+            currentRelativePath = rutaRelativa;
+
+            if (itemsLocales.isEmpty()) {
+                Toast.makeText(MainActivity.this, "Carpeta vacía", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(MainActivity.this,
+                        "Cargados: " + itemsLocales.size() + " elementos",
+                        Toast.LENGTH_SHORT).show();
+            }
+            actualizarBotonInicio();
+        });
+    }
     private void ejecutarBusquedaCompleta(String q) {
         new Thread(() -> {
             List<Manual> resultadosBusqueda = localFilesRepository.buscarArchivosLocalesRecursivo(q);

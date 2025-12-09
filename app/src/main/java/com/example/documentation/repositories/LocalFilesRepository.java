@@ -17,47 +17,6 @@ public class LocalFilesRepository {
         this.context = context;
     }
 
-    public List<Manual> cargarManualesLocales(String rutaRelativa) {
-        File carpeta = new File(context.getFilesDir(), "Manuales/" + rutaRelativa);
-        List<Manual> itemsLocales = new ArrayList<>();
-
-        Log.d(TAG, "=== CARGANDO LOCALES ===");
-        Log.d(TAG, "Ruta relativa: " + rutaRelativa);
-        Log.d(TAG, "Ruta absoluta: " + carpeta.getAbsolutePath());
-        Log.d(TAG, "Carpeta existe: " + carpeta.exists());
-
-        if (carpeta.exists()) {
-            File[] archivos = carpeta.listFiles();
-            Log.d(TAG, "Número de elementos: " + (archivos != null ? archivos.length : 0));
-
-            if (archivos != null) {
-                // Primero agregar carpetas
-                for (File archivo : archivos) {
-                    if (archivo.isDirectory()) {
-                        Manual itemCarpeta = new Manual("", archivo.getName(), true, "", rutaRelativa);
-                        itemsLocales.add(itemCarpeta);
-                        Log.d(TAG, "✓ Carpeta: " + archivo.getName());
-                    }
-                }
-
-                // Luego agregar archivos PDF
-                for (File archivo : archivos) {
-                    if (archivo.isFile() && archivo.getName().toLowerCase().endsWith(".pdf")) {
-                        String nombreArchivo = archivo.getName().replace(".pdf", "");
-                        Manual item = new Manual("", nombreArchivo, false, "", rutaRelativa);
-                        item.descargado = true;
-                        itemsLocales.add(item);
-                        Log.d(TAG, "✓ PDF: " + nombreArchivo);
-                    }
-                }
-            }
-        } else {
-            Log.d(TAG, "❌ La carpeta no existe: " + carpeta.getAbsolutePath());
-        }
-
-        Log.d(TAG, "=== CARPETA CARGADA: " + itemsLocales.size() + " elementos ===");
-        return itemsLocales;
-    }
 
     public List<Manual> buscarArchivosLocalesRecursivo(String query) {
         List<Manual> resultados = new ArrayList<>();
@@ -118,7 +77,62 @@ public class LocalFilesRepository {
         }
         return archivo.delete();
     }
+    public File obtenerArchivoLocal(Manual item) {
+        try {
+            File directorioBase = context.getFilesDir();
+            String rutaBase = "Manuales/" +
+                    (item.rutaRelativa.isEmpty() ? "" : item.rutaRelativa + "/");
 
+            Log.d(TAG, "🔍 Buscando archivo para: " + item.nombre);
+            Log.d(TAG, "📁 Ruta base: " + rutaBase);
+
+            // Lista de nombres posibles
+            List<String> nombresPosibles = new ArrayList<>();
+
+            // 1. Nombre exacto
+            nombresPosibles.add(item.nombre);
+
+            // 2. Con .pdf si es PDF
+            if (item.tipoArchivo != null && item.tipoArchivo.equals("pdf") &&
+                    !item.nombre.toLowerCase().endsWith(".pdf")) {
+                nombresPosibles.add(item.nombre + ".pdf");
+            }
+
+            // 3. Con .PDF (mayúsculas)
+            if (item.tipoArchivo != null && item.tipoArchivo.equals("pdf")) {
+                nombresPosibles.add(item.nombre + ".PDF");
+            }
+
+            // 4. Sin extensión .pdf si la tiene
+            if (item.nombre.toLowerCase().endsWith(".pdf")) {
+                nombresPosibles.add(item.nombre.substring(0, item.nombre.length() - 4));
+            }
+
+            // Buscar cada posibilidad
+            for (String nombre : nombresPosibles) {
+                String rutaCompleta = rutaBase + nombre;
+                File archivo = new File(directorioBase, rutaCompleta);
+
+                if (archivo.exists() && archivo.isFile() && archivo.length() > 0) {
+                    Log.d(TAG, "✅ Archivo encontrado: " + archivo.getAbsolutePath());
+                    return archivo;
+                }
+            }
+
+            // Si no se encuentra, devolver la ruta más probable
+            String nombreFinal = item.nombre;
+            if (item.tipoArchivo != null && item.tipoArchivo.equals("pdf") &&
+                    !item.nombre.toLowerCase().endsWith(".pdf")) {
+                nombreFinal = item.nombre + ".pdf";
+            }
+
+            return new File(directorioBase, rutaBase + nombreFinal);
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error en obtenerArchivoLocal: " + e.getMessage());
+            return new File(item.nombre);
+        }
+    }
     public List<String> obtenerTiposLocales() {
         List<String> tipos = new ArrayList<>();
         File carpetaRaiz = new File(context.getFilesDir(), "Manuales");
